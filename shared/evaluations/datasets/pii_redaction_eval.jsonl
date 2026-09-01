@@ -1,0 +1,3 @@
+{"id":"email-and-phone","input":"Contact Jane at jane@example.com or 555-123-4567.","expected_contains":["[REDACTED:EMAIL]","[REDACTED:PHONE]"]}
+{"id":"government-identifiers","input":"Passport A12345678 and tax id 123-45-6789 were submitted.","expected_contains":["[REDACTED:PASSPORT]","[REDACTED:TAX_ID]"]}
+{"id":"address","input":"Send records to 123 Main Street.","expected_contains":["[REDACTED:ADDRESS]"]}

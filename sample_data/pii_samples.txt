@@ -1,0 +1,6 @@
+Mr. John Doe can be reached at john.doe@example.com and 555-123-4567.
+Send documents to 123 Main Street.
+Passport: A12345678
+Driver Licence: CA1234567
+Card: 4111 1111 1111 1111
+Tax Identifier: 123-45-6789
