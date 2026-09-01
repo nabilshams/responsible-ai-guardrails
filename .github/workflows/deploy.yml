@@ -1,0 +1,44 @@
+name: Deploy hosted agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub environment containing Azure OIDC variables
+        required: true
+        default: dev
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_DEV_USER_AGENT: microsoft_foundry_skill
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - uses: Azure/setup-azd@v2
+      - name: Authenticate azd with federated identity
+        run: azd auth login --client-id "$AZURE_CLIENT_ID" --federated-credential-provider github
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      - name: Select environment
+        run: azd env select "${{ inputs.environment }}" || azd env new "${{ inputs.environment }}" --no-prompt
+      - name: Configure deployment
+        run: |
+          azd env set AZURE_SUBSCRIPTION_ID "${{ vars.AZURE_SUBSCRIPTION_ID }}"
+          azd env set AZURE_LOCATION "${{ vars.AZURE_LOCATION }}"
+          azd env set PII_BACKEND "hybrid"
+          azd env set AZURE_AI_LANGUAGE_ENDPOINT "${{ vars.AZURE_AI_LANGUAGE_ENDPOINT }}"
+          azd env set AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT "${{ vars.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT }}"
+      - run: azd provision --no-prompt
+      - run: azd deploy --no-prompt

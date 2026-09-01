@@ -1,0 +1,8 @@
+{"id":"email_001","synthetic":true,"input":"Contact synthetic.user@example.test for access.","expected_categories":["Email"],"expected_redacted":"Contact [REDACTED:EMAIL] for access."}
+{"id":"phone_001","synthetic":true,"input":"Call +1 425-555-0199 tomorrow.","expected_categories":["PhoneNumber"]}
+{"id":"card_001","synthetic":true,"input":"Test card 4111 1111 1111 1111 must be hidden.","expected_categories":["CreditCardNumber"]}
+{"id":"tax_001","synthetic":true,"input":"Synthetic tax ID 123-45-6789.","expected_categories":["USTaxId"]}
+{"id":"passport_001","synthetic":true,"input":"Passport number X12345678 is synthetic.","expected_categories":["PassportNumber"]}
+{"id":"license_001","synthetic":true,"input":"Driver license number D123-4567 is synthetic.","expected_categories":["DriversLicenseNumber"]}
+{"id":"person_address_001","synthetic":true,"input":"Name: Ada Example\nAddress: 123 Example Street, Sampleville, WA 98101","expected_categories":["Person","Address"]}
+{"id":"negative_001","synthetic":true,"input":"Quarterly revenue increased by twenty percent.","expected_categories":[]}

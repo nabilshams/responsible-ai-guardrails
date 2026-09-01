@@ -1,0 +1,12 @@
+name: pii-redaction-smoke
+agent:
+  name: pii-redaction-agent
+dataset:
+  local_uri: shared/evaluations/datasets/pii_redaction.jsonl
+evaluators:
+  - pii_span_precision
+  - pii_span_recall
+  - sensitive_value_leakage
+options:
+  pass_threshold: 0.95
+  max_samples: 100

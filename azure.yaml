@@ -1,0 +1,42 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+name: responsible-ai-guardrails
+requiredVersions:
+  azd: ">=1.27.1"
+extensions:
+  azure.ai.agents: ">=1.0.0-beta.9"
+services:
+  ai-project:
+    host: azure.ai.project
+    deployments: []
+  pii-redaction-agent:
+    host: azure.ai.agent
+    kind: hosted
+    name: pii-redaction-agent
+    displayName: PII Redaction Agent
+    description: Detects and redacts PII from text, documents, images, prompts, and responses.
+    project: .
+    language: python
+    codeConfiguration:
+      runtime: python_3_13
+      entryPoint: agents/pii_redaction/main.py
+    uses:
+      - ai-project
+    protocols:
+      - protocol: invocations
+        version: 1.0.0
+    metadata:
+      tags:
+        - Responsible AI
+        - PII
+        - Data Protection
+    env:
+      PII_BACKEND: ${PII_BACKEND}
+      PII_CONFIDENCE_THRESHOLD: ${PII_CONFIDENCE_THRESHOLD}
+      AZURE_AI_LANGUAGE_ENDPOINT: ${AZURE_AI_LANGUAGE_ENDPOINT}
+      AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT: ${AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT}
+    container:
+      resources:
+        cpu: "1"
+        memory: 2Gi
+infra:
+  provider: microsoft.foundry

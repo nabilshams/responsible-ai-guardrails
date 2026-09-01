@@ -1,0 +1,135 @@
+Metadata-Version: 2.4
+Name: responsible-ai-guardrails
+Version: 0.1.0
+Summary: Enterprise Responsible AI guardrails and hosted agents for Microsoft Foundry
+Author: Enterprise Agent Hub
+License: MIT
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: azure-ai-agentserver-invocations>=1.1.0b1
+Requires-Dist: azure-ai-documentintelligence>=1.0.2
+Requires-Dist: azure-ai-textanalytics>=5.3.0
+Requires-Dist: azure-identity>=1.20.0
+Requires-Dist: fastapi>=0.115.0
+Requires-Dist: httpx>=0.27.0
+Requires-Dist: opentelemetry-instrumentation-fastapi>=0.50b0
+Requires-Dist: pillow>=11.0.0
+Requires-Dist: pydantic>=2.10.0
+Requires-Dist: pydantic-settings>=2.7.0
+Requires-Dist: python-multipart>=0.0.20
+Requires-Dist: uvicorn[standard]>=0.34.0
+Provides-Extra: dev
+Requires-Dist: bandit[toml]>=1.8.0; extra == "dev"
+Requires-Dist: mypy>=1.14.0; extra == "dev"
+Requires-Dist: pip-audit>=2.8.0; extra == "dev"
+Requires-Dist: pytest>=8.3.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.25.0; extra == "dev"
+Requires-Dist: pytest-cov>=6.0.0; extra == "dev"
+Requires-Dist: ruff>=0.9.0; extra == "dev"
+
+# Responsible AI Guardrails
+
+Enterprise-ready Responsible AI guardrails and hosted agents for Microsoft Foundry. The first implementation is a privacy-first **PII Redaction Agent** for text, documents, images, prompts, and model responses.
+
+> This accelerator reduces risk; it does not guarantee that every sensitive value will be detected. Validate against your languages, jurisdictions, document types, and policies before production use.
+
+## Implemented capabilities
+
+- Azure AI Language contextual PII detection with a local structured-data fallback.
+- Names, email addresses, phone numbers, physical addresses, driver licence numbers, passport numbers, credit cards, US tax identifiers, IP addresses, and tenant-defined patterns.
+- Deterministic overlap handling and irreversible token or mask replacement.
+- Azure Document Intelligence extraction for PDF, Office, and image inputs.
+- OCR polygon-to-span mapping and opaque pixel redaction for raster images.
+- Dedicated endpoints for prompts and AI-generated responses.
+- Microsoft Foundry Invocations-protocol hosting without sending PII to a generative model.
+- Privacy-safe logs: category names, counts, status, and correlation IDs only.
+- Synthetic evaluation data, offline unit tests, CI security checks, and OIDC deployment.
+
+## Repository structure
+
+```text
+agents/                         Hosted adapters and agent-specific contracts
+	pii_redaction/                Implemented PII Redaction Agent
+	*/README.md                   Planned specialist agents
+shared/guardrails/              Detection, extraction, policy, and redaction library
+shared/evaluations/             Deterministic metrics and synthetic datasets
+tests/                          Unit and offline evaluation tests
+docs/                           Architecture, security, RAI, evaluation, deployment
+samples/                        Synthetic sample inputs only
+.foundry/                       Local Foundry evaluation metadata
+.github/workflows/              CI and protected OIDC deployment
+```
+
+## Quick start
+
+Prerequisites: Python 3.11 or newer; Python 3.13 is used by the hosted-agent configuration.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements-dev.txt
+Copy-Item .env.example .env
+pytest
+```
+
+Run the local REST adapter:
+
+```powershell
+python -m agents.pii_redaction.run_api
+```
+
+Example request:
+
+```powershell
+$body = @{ input = 'Contact synthetic.user@example.test'; language = 'en' } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/redact/text -ContentType application/json -Body $body
+```
+
+For the Microsoft Foundry hosted-agent inner loop, install dependencies and press **F5**. VS Code starts the Invocations host on port 8088 and opens Foundry Toolkit Agent Inspector.
+
+## Azure mode
+
+Use `PII_BACKEND=hybrid` and configure `AZURE_AI_LANGUAGE_ENDPOINT` plus `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT`. Authentication uses `DefaultAzureCredential`; do not configure service keys. In Azure, assign the hosted workload identity only the required Cognitive Services data-plane roles.
+
+The checked-in `azure.yaml` targets a new Foundry project but does not provision resources until an operator runs the deployment workflow or azd commands. Review networking, region, data residency, role assignments, and evaluation gates first.
+
+## Custom sensitive information
+
+Set `PII_CUSTOM_PATTERNS` to a JSON array:
+
+```json
+[
+	{
+		"name": "EmployeeId",
+		"pattern": "EMP-\\d{6}",
+		"replacement": "[EMPLOYEE]"
+	}
+]
+```
+
+Only trusted administrators should author expressions. Test them for false positives and denial-of-service behavior before rollout.
+
+## Planned agents
+
+- PII Detection Agent
+- Image Redaction Agent
+- Content Safety Agent
+- Prompt Injection Detection Agent
+- Secret & Credential Detection Agent
+- DLP Compliance Agent
+- Human Review Agent
+- Audit & Compliance Agent
+
+See `agents/README.md` for ownership and extension rules.
+
+## Documentation
+
+- Architecture: `docs/architecture.md`
+- Responsible AI: `docs/responsible-ai.md`
+- Security and threat model: `docs/security.md`
+- Evaluation strategy: `docs/evaluation.md`
+- Local and Foundry deployment: `docs/deployment.md`
+
+## Secure contribution rules
+
+Never commit or log real PII, credentials, Azure keys, production prompts, or unredacted model responses. Every detector and policy change must include synthetic positive, negative, overlap, and leakage tests. Production releases require per-entity recall review and explicit owner approval.

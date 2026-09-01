@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+
+# Secrets and local state
+.env
+.env.*
+!.env.example
+.azure/
+.foundry/results/
+test-results/
+
+# Generated redaction outputs
+outputs/
+*.redacted.png
+*.redacted.txt
+
+# Editors and OS
+.vscode/*.log
+.DS_Store
+Thumbs.db

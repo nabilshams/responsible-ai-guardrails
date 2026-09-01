@@ -1,0 +1,10 @@
+This file contains synthetic test data only.
+Name: Ada Example
+Email: synthetic.user@example.test
+Phone: +1 425-555-0199
+Address: 123 Example Street, Sampleville, WA 98101
+Driver license number D123-4567
+Passport number X12345678
+Credit card: 4111 1111 1111 1111
+Tax identifier: 123-45-6789
+Internal project code: PROJECT-EXAMPLE-001

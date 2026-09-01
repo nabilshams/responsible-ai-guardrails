@@ -1,0 +1,16 @@
+schemaVersion: "1.0"
+defaultEnvironment: dev
+azd:
+  service: pii-redaction-agent
+environments:
+  dev:
+    evaluationSuites:
+      - name: pii-redaction-smoke
+        tags:
+          tier: smoke
+        dataset:
+          localPath: shared/evaluations/datasets/pii_redaction.jsonl
+        evaluators:
+          - pii_span_precision
+          - pii_span_recall
+          - sensitive_value_leakage
