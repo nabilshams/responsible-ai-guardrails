@@ -1,0 +1,8 @@
+{
+  "cognitiveServicesAccounts": "cog-",
+  "containerRegistryRegistries": "cr-",
+  "insightsComponents": "appi-",
+  "networkNetworkSecurityGroups": "nsg-",
+  "networkVirtualNetworks": "vnet-",
+  "operationalInsightsWorkspaces": "log-"
+}

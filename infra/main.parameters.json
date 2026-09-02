@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {
+      "value": "${AZURE_ENV_NAME}"
+    },
+    "location": {
+      "value": "${AZURE_LOCATION=eastus2}"
+    },
+    "foundryPublicNetworkAccess": {
+      "value": "${FOUNDRY_PUBLIC_NETWORK_ACCESS=Enabled}"
+    },
+    "vnetAddressPrefix": {
+      "value": "${VNET_ADDRESS_PREFIX=10.40.0.0/16}"
+    },
+    "agentSubnetPrefix": {
+      "value": "${AGENT_SUBNET_PREFIX=10.40.0.0/24}"
+    },
+    "privateEndpointSubnetPrefix": {
+      "value": "${PE_SUBNET_PREFIX=10.40.1.0/24}"
+    },
+    "aiLanguageSku": {
+      "value": "${AI_LANGUAGE_SKU=F0}"
+    },
+    "docIntelligenceSku": {
+      "value": "${DOCUMENT_INTELLIGENCE_SKU=F0}"
+    }
+  }
+}

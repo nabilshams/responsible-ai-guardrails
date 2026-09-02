@@ -16,6 +16,10 @@ htmlcov/
 .foundry/results/
 test-results/
 
+# Generated ARM templates from local Bicep compilation
+infra/main.json
+infra/modules/*.json
+
 # Generated redaction outputs
 outputs/
 *.redacted.png

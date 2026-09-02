@@ -36,7 +36,8 @@ services:
       AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT: ${AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT}
     container:
       resources:
-        cpu: "1"
-        memory: 2Gi
+        cpu: "0.5"
+        memory: 1Gi
 infra:
-  provider: microsoft.foundry
+  path: infra
+  module: main

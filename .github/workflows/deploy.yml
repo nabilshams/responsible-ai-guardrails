@@ -17,7 +17,8 @@ env:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # Use self-hosted runner with VNet access for private endpoint connectivity
+    runs-on: [self-hosted, vnet-connected]
     environment: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
@@ -37,8 +38,7 @@ jobs:
         run: |
           azd env set AZURE_SUBSCRIPTION_ID "${{ vars.AZURE_SUBSCRIPTION_ID }}"
           azd env set AZURE_LOCATION "${{ vars.AZURE_LOCATION }}"
-          azd env set PII_BACKEND "hybrid"
-          azd env set AZURE_AI_LANGUAGE_ENDPOINT "${{ vars.AZURE_AI_LANGUAGE_ENDPOINT }}"
-          azd env set AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT "${{ vars.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT }}"
-      - run: azd provision --no-prompt
-      - run: azd deploy --no-prompt
+      - name: Preview infrastructure changes
+        run: azd provision --preview --no-prompt
+      - name: Provision and deploy
+        run: azd up --no-prompt

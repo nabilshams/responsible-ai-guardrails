@@ -25,6 +25,7 @@ agents/                         Hosted adapters and agent-specific contracts
 shared/guardrails/              Detection, extraction, policy, and redaction library
 shared/evaluations/             Deterministic metrics and synthetic datasets
 tests/                          Unit and offline evaluation tests
+infra/                          Bicep infrastructure templates for private network deployment
 docs/                           Architecture, security, RAI, evaluation, deployment
 samples/                        Synthetic sample inputs only
 .foundry/                       Local Foundry evaluation metadata
@@ -62,7 +63,22 @@ For the Microsoft Foundry hosted-agent inner loop, install dependencies and pres
 
 Use `PII_BACKEND=hybrid` and configure `AZURE_AI_LANGUAGE_ENDPOINT` plus `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT`. Authentication uses `DefaultAzureCredential`; do not configure service keys. In Azure, assign the hosted workload identity only the required Cognitive Services data-plane roles.
 
-The checked-in `azure.yaml` targets a new Foundry project but does not provision resources until an operator runs the deployment workflow or azd commands. Review networking, region, data residency, role assignments, and evaluation gates first.
+### Infrastructure Provisioning
+
+The repository includes modular Bicep templates under [`infra/`](./infra/) for deploying with full private network isolation:
+
+- VNet with dedicated agent subnet (delegated to Microsoft.App/environments) and private endpoint subnet
+- Microsoft Foundry AIServices, Azure AI Language, Azure Document Intelligence—all with private endpoints and managed identity
+- Basic Azure Container Registry with a public endpoint, Microsoft Entra RBAC, and admin access disabled
+- Application Insights + Log Analytics + Azure Monitor Private Link Scope
+- Private DNS zones for automatic resolution
+- Network Security Groups with minimal safe rules
+
+**Default configuration**: East US 2 region, 10.40.0.0/16 VNet, no generative model deployment (deterministic PII agent), Language F0, Document Intelligence F0, Basic ACR, and 0.5-vCPU/1-GiB hosted-agent compute. ACR intentionally uses its public endpoint and Microsoft Entra RBAC; the AI and monitoring services retain private endpoints. Free-tier limits and paid-tier overrides are documented in the deployment guide.
+
+See [`infra/README.md`](./infra/README.md) for architecture details and [`docs/deployment.md`](./docs/deployment.md) for provisioning steps.
+
+**Important**: Deployment requires a VNet-connected execution environment (self-hosted runner, Azure VM, or VPN access) to reach private endpoints. The GitHub deployment workflow is configured for self-hosted runners labeled `vnet-connected`.
 
 ## Custom sensitive information
 
