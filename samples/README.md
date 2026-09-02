@@ -1,6 +1,6 @@
 # Live document test executor
 
-Place only visibly synthetic test files in `samples/input`. Supported extensions are `.txt`, `.csv`, `.json`, `.xml`, `.md`, `.log`, `.docx`, and `.pdf`. Text files must use UTF-8; Word and PDF files are extracted through Azure Document Intelligence.
+Place only visibly synthetic test files in `samples/input`. Supported extensions are `.txt`, `.csv`, `.json`, `.xml`, `.md`, `.log`, `.docx`, and `.pdf`. Text files must use UTF-8; Word and PDF files use Azure AI Language document-based PII redaction.
 
 The repository includes synthetic fixtures for every supported format. Together they exercise names, reserved `example.test` email addresses, fictional `555` phone numbers, placeholder addresses, synthetic identifiers, payment test numbers, and documentation-reserved IP ranges.
 

@@ -9,8 +9,8 @@
     "**/__pycache__": true
   },
   "chat.tools.terminal.autoApprove": {
-    ".\\.venv\\Scripts\\python.exe": true,
-    "Write-Error": true,
-    "&": true
+    "ConvertFrom-Json": true,
+    "Out-Null": true,
+    "git check-ignore": true
   }
 }
