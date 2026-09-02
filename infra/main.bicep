@@ -33,7 +33,7 @@ param aiLanguageSku string = 'F0'
   'F0'
   'S0'
 ])
-@description('Azure Document Intelligence SKU. F0 is the lowest tier; use S0 for documents beyond the free-tier limits.')
+@description('Azure Document Intelligence SKU. F0 is for development; use S0 for production documents.')
 param docIntelligenceSku string = 'F0'
 
 @allowed([
@@ -122,7 +122,7 @@ module acr 'modules/acr.bicep' = {
   }
 }
 
-// Microsoft Foundry AI Services, AI Language, Document Intelligence
+// Microsoft Foundry AI Services, Azure AI Language, and Document Intelligence
 module ai 'modules/ai.bicep' = {
   name: 'ai-deployment'
   params: {
@@ -205,8 +205,8 @@ output AZURE_AI_PROJECT_NAME string = foundryProject.outputs.aiProjectName
 output AZURE_AI_ACCOUNT_NAME string = ai.outputs.aiServicesName
 output AZURE_AI_AISERVICES_ACCOUNT_NAME string = ai.outputs.aiServicesName
 output AZURE_AI_LANGUAGE_ENDPOINT string = ai.outputs.aiLanguageEndpoint
-output AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT string = ai.outputs.docIntelligenceEndpoint
 output AZURE_AI_LANGUAGE_RESOURCE_ID string = ai.outputs.aiLanguageId
+output AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT string = ai.outputs.docIntelligenceEndpoint
 output AZURE_DOCUMENT_INTELLIGENCE_RESOURCE_ID string = ai.outputs.docIntelligenceId
 
 // Container registry
@@ -225,6 +225,5 @@ output PE_SUBNET_ID string = network.outputs.peSubnetId
 output AZURE_RESOURCE_GROUP string = resourceGroup().name
 
 // Environment config (agent configuration values)
-output PII_BACKEND string = 'hybrid'
 output PII_CONFIDENCE_THRESHOLD string = '0.7'
 output PII_DEFAULT_LANGUAGE string = 'en'

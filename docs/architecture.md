@@ -4,29 +4,28 @@
 
 - Run deterministic protection before prompts reach generative models and after responses leave them.
 - Keep original content in memory only and never place it in logs, traces, queues, or evaluation artifacts.
-- Separate detectors, policy, redaction transforms, document extraction, hosting, and audit metadata.
+- Separate detection, policy, redaction transforms, hosting, and audit metadata.
 - Use `DefaultAzureCredential` for local developer identity, workload identity, and managed identity.
 
 ## Request flow
 
 ```mermaid
 flowchart LR
-  A[Application] --> B[Foundry hosted agent / REST adapter]
-  B --> C[Input validation and limits]
-  C --> D[Document Intelligence OCR / extraction]
-  C --> E[Text input]
-  D --> F[Composite detector]
+  A[Application] --> B{Specialist hosted agent}
+  B -->|Text| C[PII Redaction Agent]
+  B -->|Document| D[Document Intelligence extraction]
+  B -->|Image| E[Document Intelligence OCR and geometry]
+  C --> F[Azure AI Language PII]
+  D --> F
   E --> F
-  F --> G[Azure AI Language PII]
-  F --> H[Local and custom patterns]
-  G --> I[Span normalization]
-  H --> I
-  I --> J[Text tokenization]
-  I --> K[Opaque image masks]
-  J --> L[Privacy-safe response]
-  K --> L
-  L --> M[Application]
-  L -. counts and correlation only .-> N[Application Insights / audit]
+  F --> G[Span normalization]
+  G --> H{Output transform}
+  H -->|Text or document| I[Redacted text]
+  H -->|Image| J[Opaque pixel masks]
+  I --> K[Privacy-safe response]
+  J --> K
+  K --> L[Application]
+  K -. counts and correlation only .-> M[Application Insights / audit]
 ```
 
 ## Service selection
@@ -34,12 +33,13 @@ flowchart LR
 | Capability | Service | Rationale |
 | --- | --- | --- |
 | Contextual PII | Azure AI Language | Names, addresses, identity categories, multilingual models |
-| OCR and layout | Azure Document Intelligence | Word spans and polygons for documents and images |
-| General visual objects | Azure AI Vision | Planned Image Redaction Agent |
+| Document extraction and OCR geometry | Azure Document Intelligence | Extracts document text and locates image words |
+| Image PII masking | Document Intelligence + Azure AI Language | Maps detected PII spans back to irreversible pixel masks |
+| General visual objects | Azure AI Vision | Planned extension for non-text objects and faces |
 | Multimodal schema extraction | Azure AI Content Understanding | Planned complex document policies; keep behind an adapter |
 | Harm categories | Azure AI Content Safety | Planned Content Safety and prompt-attack controls |
 | Agent hosting and lifecycle | Microsoft Foundry | Managed hosted-agent runtime, identity, telemetry, and evaluation |
 
 ## Extension contract
 
-New detectors implement `PiiDetector.detect()`. New redactors consume normalized `DetectedEntity` spans. New hosting adapters call `PiiRedactionService`; they must not duplicate policy or emit source values.
+New detectors implement `PiiDetector.detect()`. New redactors consume normalized `DetectedEntity` spans. Hosting adapters call the relevant shared service and must not duplicate policy or emit source values. The PII agent accepts text only; document and image transformations remain isolated in their own agents.

@@ -110,7 +110,7 @@ resource aiLanguagePrivateEndpointDnsGroup 'Microsoft.Network/privateEndpoints/p
   }
 }
 
-// Private endpoint for Document Intelligence
+// Private endpoint for Azure Document Intelligence
 resource docIntelligencePrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   name: 'pe-docintel'
   location: location

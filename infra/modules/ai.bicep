@@ -78,7 +78,7 @@ resource aiLanguage 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
 }
 
-// Azure Document Intelligence (document extraction and OCR)
+// Azure Document Intelligence (document extraction and OCR geometry)
 resource docIntelligence 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   name: docIntelligenceName
   location: location
@@ -98,7 +98,7 @@ resource docIntelligence 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
       ipRules: []
       virtualNetworkRules: []
     }
-    disableLocalAuth: true // Managed identity only
+    disableLocalAuth: true
   }
 }
 

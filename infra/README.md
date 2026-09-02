@@ -14,8 +14,7 @@ The infrastructure provisions:
 - **AI Services**:
   - Microsoft Foundry AIServices account S0 (lowest supported Foundry tier, with system identity)
   - Azure AI Language F0 by default (PII detection, managed identity only)
-  - Azure Document Intelligence F0 by default (document extraction, managed identity only)
-  - Foundry public access is configurable and enabled by the azd parameter binding; Language and Document Intelligence remain private-only
+  - Foundry public access is configurable and enabled by the azd parameter binding; Azure AI Language remains private-only
 
 - **Container Infrastructure**:
   - Azure Container Registry Basic with public network access, Microsoft Entra RBAC, and no admin/anonymous access
@@ -27,7 +26,7 @@ The infrastructure provisions:
   - Azure Monitor Private Link Scope with all required DNS zones
 
 - **Private DNS Zones**:
-  - `privatelink.cognitiveservices.azure.com` (Language, Document Intelligence)
+  - `privatelink.cognitiveservices.azure.com` (Azure AI Language)
   - `privatelink.openai.azure.com` (Foundry compatibility)
   - `privatelink.services.ai.azure.com` (Foundry AIServices)
   - `privatelink.monitor.azure.com`, `privatelink.oms.opinsights.azure.com`, `privatelink.ods.opinsights.azure.com`, `privatelink.agentsvc.azure-automation.net` (Azure Monitor)
@@ -51,7 +50,6 @@ The `main.parameters.json` file defines azd environment variable bindings:
 - `AGENT_SUBNET_PREFIX`: Agent subnet CIDR (default: `10.40.0.0/24`)
 - `PE_SUBNET_PREFIX`: Private endpoint subnet CIDR (default: `10.40.1.0/24`)
 - `AI_LANGUAGE_SKU`: Language tier (default: `F0`; set to `S` for production volume)
-- `DOCUMENT_INTELLIGENCE_SKU`: Document Intelligence tier (default: `F0`; set to `S0` for production documents)
 
 ### Cost-Minimized Defaults
 
@@ -60,10 +58,10 @@ The template uses the lowest tiers compatible with each resource role:
 - Foundry AIServices remains `S0`, the required standard tier for the Foundry account.
 - ACR uses `Basic`, the lowest tier. It intentionally has no private endpoint; its public endpoint is protected by Microsoft Entra RBAC and the admin account is disabled.
 - Log Analytics remains pay-as-you-go (`PerGB2018`); Application Insights has no separate capacity SKU.
-- Language and Document Intelligence default to `F0`. Azure permits only a limited number of free-tier resources per subscription, and regional availability can vary. Override either SKU when deployment validation reports that F0 is unavailable.
+- Azure AI Language defaults to `F0`. Azure permits only a limited number of free-tier resources per subscription, and regional availability can vary. Override the SKU when deployment validation reports that F0 is unavailable.
 - Hosted-agent compute is 0.5 vCPU and 1 GiB memory.
 
-The free tiers are intended for development and evaluation. Language F0 provides 5,000 free text records per month. Document Intelligence F0 processes only the first two pages, accepts files up to 4 MB, and is limited to 1 transaction per second. To retain this application's larger/multi-page document behavior, set `DOCUMENT_INTELLIGENCE_SKU=S0`.
+The free tier is intended for development and evaluation. Language F0 provides 5,000 free text records per month. Use `AI_LANGUAGE_SKU=S` for production volume.
 
 ### Provision with azd
 
@@ -81,9 +79,8 @@ azd env set VNET_ADDRESS_PREFIX "10.50.0.0/16"
 azd env set AGENT_SUBNET_PREFIX "10.50.0.0/24"
 azd env set PE_SUBNET_PREFIX "10.50.1.0/24"
 
-# Optional: opt into paid production tiers
+# Optional: opt into the paid production tier
 azd env set AI_LANGUAGE_SKU "S"
-azd env set DOCUMENT_INTELLIGENCE_SKU "S0"
 
 # Preview changes
 azd provision --preview
@@ -105,7 +102,7 @@ azd up --no-prompt
 
 The Bicep templates configure ACR pull access for the Foundry project identity. However, **the hosted agent's runtime identity is created only during `azd deploy`**, after infrastructure provisioning.
 
-Once deployed, grant the agent identity data-plane access to AI Language and Document Intelligence:
+Once deployed, grant the agent identity data-plane access to Azure AI Language:
 
 ```powershell
 # Get the agent identity principal ID (from Foundry agent resource)
@@ -123,11 +120,6 @@ az role assignment create `
   --role $cognitiveServicesUserRole `
   --scope $environment.AZURE_AI_LANGUAGE_RESOURCE_ID
 
-# Grant access to Document Intelligence
-az role assignment create `
-  --assignee $agentIdentityId `
-  --role $cognitiveServicesUserRole `
-  --scope $environment.AZURE_DOCUMENT_INTELLIGENCE_RESOURCE_ID
 ```
 
 > **Note**: If azd's hosted-agent deployment supports automatic RBAC assignment for agent identity, this step may be handled automatically. Verify by testing agent invocations.
@@ -155,7 +147,7 @@ Resolve-DnsName your-language-name.cognitiveservices.azure.com
 
 ### Test Agent Access
 
-Use Agent Inspector or direct invocation to verify the agent can access Language and Document Intelligence APIs:
+Use Agent Inspector or direct invocation to verify the agent can access Azure AI Language:
 
 ```powershell
 # Example invocation (replace with actual endpoint)
@@ -173,16 +165,16 @@ Invoke-RestMethod -Method Post -Uri "https://your-agent-endpoint/invoke" `
 | `modules/dns.bicep` | Private DNS | 7 private DNS zones + VNet links |
 | `modules/monitoring.bicep` | Observability | Log Analytics, App Insights, AMPLS |
 | `modules/acr.bicep` | Container registry | Basic public ACR with diagnostics and RBAC-only access |
-| `modules/ai.bicep` | AI services | AIServices, Language, Doc Intelligence |
+| `modules/ai.bicep` | AI services | AIServices and Azure AI Language |
 | `modules/foundryProject.bicep` | Foundry workspace | Project and Basic capability host |
 | `modules/foundryMonitoringConnection.bicep` | Foundry observability | Shared Application Insights connection |
-| `modules/privateEndpoints.bicep` | Private connectivity | 4 private endpoints with DNS groups |
+| `modules/privateEndpoints.bicep` | Private connectivity | 3 private endpoints with DNS groups |
 | `modules/rbac.bicep` | Access control | ACR pull role for AI Services |
 
 ## Security Notes
 
 - **No secrets in source control**: All authentication uses managed identities or DefaultAzureCredential
-- **Scoped public access**: Foundry public access is configurable to support workstation deployment; Language, Document Intelligence, and monitoring remain private-only. ACR intentionally uses a public endpoint with Microsoft Entra RBAC and its admin account disabled
+- **Scoped public access**: Foundry public access is configurable to support workstation deployment; Azure AI Language and monitoring remain private-only. ACR intentionally uses a public endpoint with Microsoft Entra RBAC and its admin account disabled
 - **Least privilege**: AI Services has only ACR pull; agent identity requires explicit Cognitive Services User assignment
 - **Audit logs**: All resources send diagnostics to Log Analytics
 - **Network isolation**: NSGs enforce minimal safe rules; egress to Azure services via service tags
@@ -197,7 +189,7 @@ Invoke-RestMethod -Method Post -Uri "https://your-agent-endpoint/invoke" `
 ## API Versions
 
 - Foundry account/project: `2025-04-01-preview`
-- Language and Document Intelligence: `2024-10-01`
+- Azure AI Language: `2024-10-01`
 - Container Registry: `2023-07-01`
 - Network resources: `2024-05-01` / `2024-06-01`
 - OperationalInsights/workspaces: `2023-09-01`

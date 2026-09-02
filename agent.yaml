@@ -11,8 +11,6 @@ resources:
   memory: 1Gi
 environment:
   required:
-    - PII_BACKEND
-  optional:
     - AZURE_AI_LANGUAGE_ENDPOINT
-    - AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT
+  optional:
     - APPLICATIONINSIGHTS_CONNECTION_STRING

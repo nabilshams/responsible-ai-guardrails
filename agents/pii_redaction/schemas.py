@@ -18,5 +18,3 @@ class RedactionResponse(BaseModel):
     entities: list[EntityResult]
     entity_counts: dict[str, int]
     correlation_id: str
-    redacted_file_base64: str | None = None
-    redacted_file_content_type: str | None = None

@@ -48,6 +48,52 @@
       }
     },
     {
+      "label": "Run Document Redaction Agent",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe -m debugpy --listen 127.0.0.1:5679 agents/document_redaction/main.py",
+      "isBackground": true,
+      "options": { "cwd": "${workspaceFolder}" },
+      "dependsOn": ["Validate prerequisites"],
+      "problemMatcher": {
+        "pattern": [{ "regexp": "^.*$", "file": 0, "location": 1, "message": 2 }],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "Application startup complete|[Rr]unning on|Started server process"
+        }
+      }
+    },
+    {
+      "label": "Open Document Redaction Agent Inspector",
+      "type": "shell",
+      "command": "echo '${input:openAgentInspector}'",
+      "presentation": { "reveal": "never" },
+      "dependsOn": ["Run Document Redaction Agent"]
+    },
+    {
+      "label": "Run Image Redaction Agent",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe -m debugpy --listen 127.0.0.1:5679 agents/image_redaction/main.py",
+      "isBackground": true,
+      "options": { "cwd": "${workspaceFolder}" },
+      "dependsOn": ["Validate prerequisites"],
+      "problemMatcher": {
+        "pattern": [{ "regexp": "^.*$", "file": 0, "location": 1, "message": 2 }],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "Application startup complete|[Rr]unning on|Started server process"
+        }
+      }
+    },
+    {
+      "label": "Open Image Redaction Agent Inspector",
+      "type": "shell",
+      "command": "echo '${input:openAgentInspector}'",
+      "presentation": { "reveal": "never" },
+      "dependsOn": ["Run Image Redaction Agent"]
+    },
+    {
       "label": "Terminate All Tasks",
       "command": "echo ${input:terminate}",
       "type": "shell",

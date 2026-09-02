@@ -1,17 +1,17 @@
 # Responsible AI Guardrails
 
-Enterprise-ready Responsible AI guardrails and hosted agents for Microsoft Foundry. The first implementation is a privacy-first **PII Redaction Agent** for text, documents, images, prompts, and model responses.
+Enterprise-ready Responsible AI guardrails and hosted agents for Microsoft Foundry. The implementation separates text, document, and image redaction into independently deployable specialists.
 
-> This accelerator reduces risk; it does not guarantee that every sensitive value will be detected. Validate against your languages, jurisdictions, document types, and policies before production use.
+> This accelerator reduces risk; it does not guarantee that every sensitive value will be detected. Validate against your languages, jurisdictions, and policies before production use.
 
 ## Implemented capabilities
 
-- Azure AI Language contextual PII detection with a local structured-data fallback.
-- Names, email addresses, phone numbers, physical addresses, driver licence numbers, passport numbers, credit cards, US tax identifiers, IP addresses, and tenant-defined patterns.
+- Azure AI Language contextual PII detection as the only detection backend.
+- Text categories supported by Azure AI Language, including names, contact details, addresses, and identity information.
 - Deterministic overlap handling and irreversible token or mask replacement.
-- Azure Document Intelligence extraction for PDF, Office, and image inputs.
-- OCR polygon-to-span mapping and opaque pixel redaction for raster images.
-- Dedicated endpoints for prompts and AI-generated responses.
+- PII Redaction Agent for text, prompts, and AI-generated responses.
+- Document Redaction Agent supporting UTF-8 `.txt`, `.csv`, `.json`, `.xml`, `.md`, and `.log` files directly, with Azure Document Intelligence extraction for complex formats and Azure AI Language PII detection; output is redacted extracted text rather than a rewritten PDF or Office binary.
+- Image Redaction Agent using Document Intelligence OCR geometry and Azure AI Language PII detection to burn masks into a redacted PNG.
 - Microsoft Foundry Invocations-protocol hosting without sending PII to a generative model.
 - Privacy-safe logs: category names, counts, status, and correlation IDs only.
 - Synthetic evaluation data, offline unit tests, CI security checks, and OIDC deployment.
@@ -21,6 +21,8 @@ Enterprise-ready Responsible AI guardrails and hosted agents for Microsoft Found
 ```text
 agents/                         Hosted adapters and agent-specific contracts
   pii_redaction/                Implemented PII Redaction Agent
+  document_redaction/           Implemented Document Redaction Agent
+  image_redaction/              Implemented Image Redaction Agent
   */README.md                   Planned specialist agents
 shared/guardrails/              Detection, extraction, policy, and redaction library
 shared/evaluations/             Deterministic metrics and synthetic datasets
@@ -61,45 +63,28 @@ For the Microsoft Foundry hosted-agent inner loop, install dependencies and pres
 
 ## Azure mode
 
-Use `PII_BACKEND=hybrid` and configure `AZURE_AI_LANGUAGE_ENDPOINT` plus `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT`. Authentication uses `DefaultAzureCredential`; do not configure service keys. In Azure, assign the hosted workload identity only the required Cognitive Services data-plane roles.
+Configure `AZURE_AI_LANGUAGE_ENDPOINT` for every agent and `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` for document and image agents. Authentication uses `DefaultAzureCredential`; do not configure service keys. Assign each hosted workload identity only the Cognitive Services User data-plane roles required by that specialist.
 
 ### Infrastructure Provisioning
 
 The repository includes modular Bicep templates under [`infra/`](./infra/) for deploying with full private network isolation:
 
 - VNet with dedicated agent subnet (delegated to Microsoft.App/environments) and private endpoint subnet
-- Microsoft Foundry AIServices, Azure AI Language, Azure Document Intelligence—all with private endpoints and managed identity
+- Microsoft Foundry AIServices and Azure AI Language with private endpoints and managed identity
 - Basic Azure Container Registry with a public endpoint, Microsoft Entra RBAC, and admin access disabled
 - Application Insights + Log Analytics + Azure Monitor Private Link Scope
 - Private DNS zones for automatic resolution
 - Network Security Groups with minimal safe rules
 
-**Default configuration**: East US 2 region, 10.40.0.0/16 VNet, no generative model deployment (deterministic PII agent), Language F0, Document Intelligence F0, Basic ACR, and 0.5-vCPU/1-GiB hosted-agent compute. ACR intentionally uses its public endpoint and Microsoft Entra RBAC; the AI and monitoring services retain private endpoints. Free-tier limits and paid-tier overrides are documented in the deployment guide.
+**Default configuration**: East US 2 region, 10.40.0.0/16 VNet, no generative model deployment, Language F0, Basic ACR, and 0.5-vCPU/1-GiB hosted-agent compute. ACR intentionally uses its public endpoint and Microsoft Entra RBAC; Azure AI Language and monitoring retain private endpoints. Free-tier limits and paid-tier overrides are documented in the deployment guide.
 
 See [`infra/README.md`](./infra/README.md) for architecture details and [`docs/deployment.md`](./docs/deployment.md) for provisioning steps.
 
 **Important**: Deployment requires a VNet-connected execution environment (self-hosted runner, Azure VM, or VPN access) to reach private endpoints. The GitHub deployment workflow is configured for self-hosted runners labeled `vnet-connected`.
 
-## Custom sensitive information
-
-Set `PII_CUSTOM_PATTERNS` to a JSON array:
-
-```json
-[
-  {
-    "name": "EmployeeId",
-    "pattern": "EMP-\\d{6}",
-    "replacement": "[EMPLOYEE]"
-  }
-]
-```
-
-Only trusted administrators should author expressions. Test them for false positives and denial-of-service behavior before rollout.
-
-## Planned agents
+## Additional planned agents
 
 - PII Detection Agent
-- Image Redaction Agent
 - Content Safety Agent
 - Prompt Injection Detection Agent
 - Secret & Credential Detection Agent

@@ -18,6 +18,24 @@
       "preLaunchTask": "Run Agent/Workflow in Terminal",
       "internalConsoleOptions": "neverOpen",
       "postDebugTask": "Terminate All Tasks"
+    },
+    {
+      "name": "Debug Local Document Redaction Agent",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": { "host": "localhost", "port": 5679 },
+      "preLaunchTask": "Open Document Redaction Agent Inspector",
+      "internalConsoleOptions": "neverOpen",
+      "postDebugTask": "Terminate All Tasks"
+    },
+    {
+      "name": "Debug Local Image Redaction Agent",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": { "host": "localhost", "port": 5679 },
+      "preLaunchTask": "Open Image Redaction Agent Inspector",
+      "internalConsoleOptions": "neverOpen",
+      "postDebugTask": "Terminate All Tasks"
     }
   ]
 }

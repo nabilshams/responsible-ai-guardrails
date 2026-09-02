@@ -6,7 +6,7 @@ targetScope = 'resourceGroup'
 param vnetId string
 param tags object
 
-// Cognitive Services (Language, Document Intelligence)
+// Cognitive Services (Azure AI Language)
 resource cognitiveServicesDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
   name: 'privatelink.cognitiveservices.azure.com'
   location: 'global'

@@ -13,7 +13,7 @@ services:
     kind: hosted
     name: pii-redaction-agent
     displayName: PII Redaction Agent
-    description: Detects and redacts PII from text, documents, images, prompts, and responses.
+    description: Detects PII with Azure AI Language and redacts text, prompts, and responses.
     project: .
     language: python
     codeConfiguration:
@@ -30,7 +30,63 @@ services:
         - PII
         - Data Protection
     env:
-      PII_BACKEND: ${PII_BACKEND}
+      PII_CONFIDENCE_THRESHOLD: ${PII_CONFIDENCE_THRESHOLD}
+      AZURE_AI_LANGUAGE_ENDPOINT: ${AZURE_AI_LANGUAGE_ENDPOINT}
+    container:
+      resources:
+        cpu: "0.5"
+        memory: 1Gi
+  document-redaction-agent:
+    host: azure.ai.agent
+    kind: hosted
+    name: document-redaction-agent
+    displayName: Document Redaction Agent
+    description: Extracts document text and redacts PII using Azure Document Intelligence and Azure AI Language.
+    project: .
+    language: python
+    codeConfiguration:
+      runtime: python_3_13
+      entryPoint: agents/document_redaction/main.py
+    uses:
+      - ai-project
+    protocols:
+      - protocol: invocations
+        version: 1.0.0
+    metadata:
+      tags:
+        - Responsible AI
+        - Document Redaction
+        - Data Protection
+    env:
+      PII_CONFIDENCE_THRESHOLD: ${PII_CONFIDENCE_THRESHOLD}
+      AZURE_AI_LANGUAGE_ENDPOINT: ${AZURE_AI_LANGUAGE_ENDPOINT}
+      AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT: ${AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT}
+    container:
+      resources:
+        cpu: "0.5"
+        memory: 1Gi
+  image-redaction-agent:
+    host: azure.ai.agent
+    kind: hosted
+    name: image-redaction-agent
+    displayName: Image Redaction Agent
+    description: Masks image pixels containing PII using Azure Document Intelligence OCR and Azure AI Language.
+    project: .
+    language: python
+    codeConfiguration:
+      runtime: python_3_13
+      entryPoint: agents/image_redaction/main.py
+    uses:
+      - ai-project
+    protocols:
+      - protocol: invocations
+        version: 1.0.0
+    metadata:
+      tags:
+        - Responsible AI
+        - Image Redaction
+        - Data Protection
+    env:
       PII_CONFIDENCE_THRESHOLD: ${PII_CONFIDENCE_THRESHOLD}
       AZURE_AI_LANGUAGE_ENDPOINT: ${AZURE_AI_LANGUAGE_ENDPOINT}
       AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT: ${AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT}

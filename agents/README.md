@@ -4,9 +4,10 @@ Each agent owns only hosting, request validation, and orchestration. Reusable po
 
 | Agent | Status | Purpose |
 | --- | --- | --- |
-| PII Redaction | Implemented | Detect and remove sensitive text; burn OCR-aligned masks into images |
+| PII Redaction | Implemented | Detect and remove sensitive text using Azure AI Language only |
 | PII Detection | Planned | Classify and locate PII without modifying content |
-| Image Redaction | Planned | General visual-region and face redaction |
+| Document Redaction | Implemented | Extract document text and redact PII with Document Intelligence and Language |
+| Image Redaction | Implemented | OCR images and burn PII-aligned masks into output pixels |
 | Content Safety | Planned | Azure AI Content Safety policy enforcement |
 | Prompt Injection Detection | Planned | Detect direct and indirect prompt attacks |
 | Secret & Credential Detection | Planned | Detect keys, tokens, passwords, and connection strings |

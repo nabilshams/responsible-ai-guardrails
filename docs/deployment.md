@@ -4,8 +4,8 @@
 
 1. Create `.venv` and install `requirements-dev.txt`.
 2. Copy `.env.example` to `.env`.
-3. Leave `PII_BACKEND=local` for offline tests, or configure Azure endpoints and use `hybrid`.
-4. Press F5 to start the Invocations protocol host on port 8088 and open Agent Inspector.
+3. Configure `AZURE_AI_LANGUAGE_ENDPOINT` for all agents and `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` for document/image agents; authentication uses `DefaultAzureCredential`.
+4. Select the desired specialist debug profile and press F5 to start its Invocations protocol host on port 8088 and open Agent Inspector.
 5. Run `python -m agents.pii_redaction.run_api` for the optional REST adapter on port 8000.
 
 ## Azure Infrastructure Provisioning
@@ -24,11 +24,11 @@ This solution uses custom Bicep templates for full control over networking, priv
 The Bicep templates provision:
 
 - **Private network**: VNet (default 10.40.0.0/16) with agent subnet (10.40.0.0/24, delegated to Microsoft.App/environments) and private endpoint subnet (10.40.1.0/24)
-- **AI Services**: Microsoft Foundry AIServices account with configurable public access, plus private-only Azure AI Language and Azure Document Intelligence resources; all use system-managed identity and retain private endpoints
+- **AI Services**: Microsoft Foundry AIServices account with configurable public access plus private-only Azure AI Language and Document Intelligence; all use system-managed identity and retain private endpoints
 - **Container Registry**: Basic Azure Container Registry with public network access, admin user disabled, and Microsoft Entra RBAC
 - **Monitoring**: Application Insights + Log Analytics + Azure Monitor Private Link Scope for private-only telemetry
 - **Private DNS**: 7 private DNS zones linked to the VNet for automatic private endpoint resolution
-- **RBAC**: Foundry project identity receives ACR pull access; agent runtime identity (created during deployment) requires Cognitive Services User on the two specialist AI resources
+- **RBAC**: Foundry project identity receives ACR pull access; each agent runtime identity receives only its required Cognitive Services User assignments
 
 See [`infra/README.md`](../infra/README.md) for detailed architecture and module reference.
 
@@ -43,9 +43,9 @@ Default values (customizable via azd environment variables):
 - **Private endpoint subnet**: 10.40.1.0/24
 - **No generative model deployment**: This template provisions deterministic PII detection only
 - **Cost-minimized SKUs**: Language F0, Document Intelligence F0, Foundry AIServices S0, Basic ACR, and pay-as-you-go Log Analytics
-- **Hosted-agent compute**: 0.5 vCPU and 1 GiB memory
+- **Hosted-agent compute**: 0.5 vCPU and 1 GiB memory per specialist
 
-ACR uses the lowest `Basic` tier and intentionally does not use Private Link. Its public endpoint is required for image push/pull, while Microsoft Entra RBAC and a disabled admin account protect access. Foundry AIServices remains S0. The free AI service tiers are development defaults: Language F0 includes 5,000 text records per month, while Document Intelligence F0 is limited to 4 MB files, the first two pages, and 1 transaction per second. Free-tier resource count and regional availability restrictions also apply. For production or for the application's larger and multi-page document inputs, set `AI_LANGUAGE_SKU=S` and `DOCUMENT_INTELLIGENCE_SKU=S0` before provisioning.
+ACR uses the lowest `Basic` tier and intentionally does not use Private Link. Its public endpoint is required for image push/pull, while Microsoft Entra RBAC and a disabled admin account protect access. Foundry AIServices remains S0. Language and Document Intelligence use F0 development defaults. Free-tier resource count and regional availability restrictions apply. For production volume, set `AI_LANGUAGE_SKU=S` and `DOCUMENT_INTELLIGENCE_SKU=S0` before provisioning.
 
 ### Deployment Steps
 
@@ -63,7 +63,7 @@ azd env set VNET_ADDRESS_PREFIX "10.50.0.0/16"
 azd env set AGENT_SUBNET_PREFIX "10.50.0.0/24"
 azd env set PE_SUBNET_PREFIX "10.50.1.0/24"
 
-# Optional: use paid tiers for production volume and full document limits
+# Optional: use paid tiers for production volume
 azd env set AI_LANGUAGE_SKU "S"
 azd env set DOCUMENT_INTELLIGENCE_SKU "S0"
 
@@ -76,7 +76,7 @@ azd up --no-prompt
 
 ### Post-Deployment: Agent Identity RBAC
 
-The agent's runtime managed identity is created only during `azd deploy`, after Bicep provisioning. Grant this identity data-plane access to AI Language and Document Intelligence:
+Each runtime managed identity is created only during `azd deploy`. Grant the PII agent access to Azure AI Language only. Grant the document and image agents access to both Azure AI Language and Document Intelligence.
 
 ```powershell
 # Retrieve agent identity principal ID (from azd output or Foundry agent resource)
@@ -88,11 +88,9 @@ $roleId = "a97b65f3-24c7-4388-baec-2e87135dc908"
 # Get resource IDs from azd environment
 $environment = azd env get-values --output json | ConvertFrom-Json
 $languageId = $environment.AZURE_AI_LANGUAGE_RESOURCE_ID
-$docIntelId = $environment.AZURE_DOCUMENT_INTELLIGENCE_RESOURCE_ID
 
 # Assign roles
 az role assignment create --assignee $agentPrincipalId --role $roleId --scope $languageId
-az role assignment create --assignee $agentPrincipalId --role $roleId --scope $docIntelId
 ```
 
 > **Note**: If the azd hosted-agent deployment flow supports automatic RBAC for agent identity, this step may be automated. Verify by testing agent invocations.
@@ -160,17 +158,4 @@ Text:
 {"input":"Contact synthetic.user@example.test","language":"en"}
 ```
 
-Document or image:
-
-```json
-{
-  "document": {
-    "content_base64": "<base64>",
-    "content_type": "image/png",
-    "filename": "synthetic.png"
-  },
-  "language": "en"
-}
-```
-
-The response streams a JSON object containing redacted text, entity metadata without values, and—for raster images—a base64-encoded redacted PNG.
+The response streams a JSON object containing redacted text and entity metadata without original values.

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from io import BytesIO
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, UnidentifiedImageError
 
 from .models import DetectedEntity, ExtractedDocument
 
 
 class ImageRedactor:
-    """Burns opaque rectangles into pixels intersecting sensitive text spans."""
+    """Burn opaque rectangles into pixels intersecting sensitive text spans."""
 
     def redact(
         self,
@@ -18,8 +18,14 @@ class ImageRedactor:
         document: ExtractedDocument,
         entities: list[DetectedEntity],
     ) -> bytes:
-        with Image.open(BytesIO(image_bytes)) as source:
-            image = source.convert("RGB")
+        try:
+            with Image.open(BytesIO(image_bytes)) as source:
+                source.verify()
+            with Image.open(BytesIO(image_bytes)) as source:
+                image = source.convert("RGB")
+        except (UnidentifiedImageError, OSError) as exc:
+            raise ValueError("Input is not a supported image") from exc
+
         draw = ImageDraw.Draw(image)
         scale_x = image.width / document.page_width if document.page_width else 1.0
         scale_y = image.height / document.page_height if document.page_height else 1.0
@@ -28,7 +34,8 @@ class ImageRedactor:
             if region.page_number != 1:
                 continue
             intersects = any(
-                entity.offset < region.end and region.offset < entity.end for entity in entities
+                entity.offset < region.end and region.offset < entity.end
+                for entity in entities
             )
             if not intersects or len(region.polygon) < 4:
                 continue

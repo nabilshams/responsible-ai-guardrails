@@ -7,16 +7,13 @@ License: MIT
 Requires-Python: >=3.11
 Description-Content-Type: text/markdown
 Requires-Dist: azure-ai-agentserver-invocations>=1.1.0b1
-Requires-Dist: azure-ai-documentintelligence>=1.0.2
 Requires-Dist: azure-ai-textanalytics>=5.3.0
 Requires-Dist: azure-identity>=1.20.0
 Requires-Dist: fastapi>=0.115.0
 Requires-Dist: httpx>=0.27.0
 Requires-Dist: opentelemetry-instrumentation-fastapi>=0.50b0
-Requires-Dist: pillow>=11.0.0
 Requires-Dist: pydantic>=2.10.0
 Requires-Dist: pydantic-settings>=2.7.0
-Requires-Dist: python-multipart>=0.0.20
 Requires-Dist: uvicorn[standard]>=0.34.0
 Provides-Extra: dev
 Requires-Dist: bandit[toml]>=1.8.0; extra == "dev"
@@ -29,17 +26,15 @@ Requires-Dist: ruff>=0.9.0; extra == "dev"
 
 # Responsible AI Guardrails
 
-Enterprise-ready Responsible AI guardrails and hosted agents for Microsoft Foundry. The first implementation is a privacy-first **PII Redaction Agent** for text, documents, images, prompts, and model responses.
+Enterprise-ready Responsible AI guardrails and hosted agents for Microsoft Foundry. The first implementation is a privacy-first **PII Redaction Agent** for text, prompts, and model responses.
 
-> This accelerator reduces risk; it does not guarantee that every sensitive value will be detected. Validate against your languages, jurisdictions, document types, and policies before production use.
+> This accelerator reduces risk; it does not guarantee that every sensitive value will be detected. Validate against your languages, jurisdictions, and policies before production use.
 
 ## Implemented capabilities
 
-- Azure AI Language contextual PII detection with a local structured-data fallback.
-- Names, email addresses, phone numbers, physical addresses, driver licence numbers, passport numbers, credit cards, US tax identifiers, IP addresses, and tenant-defined patterns.
+- Azure AI Language contextual PII detection as the only detection backend.
+- Text categories supported by Azure AI Language, including names, contact details, addresses, and identity information.
 - Deterministic overlap handling and irreversible token or mask replacement.
-- Azure Document Intelligence extraction for PDF, Office, and image inputs.
-- OCR polygon-to-span mapping and opaque pixel redaction for raster images.
 - Dedicated endpoints for prompts and AI-generated responses.
 - Microsoft Foundry Invocations-protocol hosting without sending PII to a generative model.
 - Privacy-safe logs: category names, counts, status, and correlation IDs only.
@@ -49,11 +44,12 @@ Enterprise-ready Responsible AI guardrails and hosted agents for Microsoft Found
 
 ```text
 agents/                         Hosted adapters and agent-specific contracts
-	pii_redaction/                Implemented PII Redaction Agent
-	*/README.md                   Planned specialist agents
-shared/guardrails/              Detection, extraction, policy, and redaction library
+  pii_redaction/                Implemented PII Redaction Agent
+  */README.md                   Planned specialist agents
+shared/guardrails/              Detection, policy, and redaction library
 shared/evaluations/             Deterministic metrics and synthetic datasets
 tests/                          Unit and offline evaluation tests
+infra/                          Bicep infrastructure templates for private network deployment
 docs/                           Architecture, security, RAI, evaluation, deployment
 samples/                        Synthetic sample inputs only
 .foundry/                       Local Foundry evaluation metadata
@@ -89,25 +85,24 @@ For the Microsoft Foundry hosted-agent inner loop, install dependencies and pres
 
 ## Azure mode
 
-Use `PII_BACKEND=hybrid` and configure `AZURE_AI_LANGUAGE_ENDPOINT` plus `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT`. Authentication uses `DefaultAzureCredential`; do not configure service keys. In Azure, assign the hosted workload identity only the required Cognitive Services data-plane roles.
+Configure `AZURE_AI_LANGUAGE_ENDPOINT`. Authentication uses `DefaultAzureCredential`; do not configure service keys. In Azure, assign the hosted workload identity the Cognitive Services User data-plane role on Azure AI Language.
 
-The checked-in `azure.yaml` targets a new Foundry project but does not provision resources until an operator runs the deployment workflow or azd commands. Review networking, region, data residency, role assignments, and evaluation gates first.
+### Infrastructure Provisioning
 
-## Custom sensitive information
+The repository includes modular Bicep templates under [`infra/`](./infra/) for deploying with full private network isolation:
 
-Set `PII_CUSTOM_PATTERNS` to a JSON array:
+- VNet with dedicated agent subnet (delegated to Microsoft.App/environments) and private endpoint subnet
+- Microsoft Foundry AIServices and Azure AI Language with private endpoints and managed identity
+- Basic Azure Container Registry with a public endpoint, Microsoft Entra RBAC, and admin access disabled
+- Application Insights + Log Analytics + Azure Monitor Private Link Scope
+- Private DNS zones for automatic resolution
+- Network Security Groups with minimal safe rules
 
-```json
-[
-	{
-		"name": "EmployeeId",
-		"pattern": "EMP-\\d{6}",
-		"replacement": "[EMPLOYEE]"
-	}
-]
-```
+**Default configuration**: East US 2 region, 10.40.0.0/16 VNet, no generative model deployment, Language F0, Basic ACR, and 0.5-vCPU/1-GiB hosted-agent compute. ACR intentionally uses its public endpoint and Microsoft Entra RBAC; Azure AI Language and monitoring retain private endpoints. Free-tier limits and paid-tier overrides are documented in the deployment guide.
 
-Only trusted administrators should author expressions. Test them for false positives and denial-of-service behavior before rollout.
+See [`infra/README.md`](./infra/README.md) for architecture details and [`docs/deployment.md`](./docs/deployment.md) for provisioning steps.
+
+**Important**: Deployment requires a VNet-connected execution environment (self-hosted runner, Azure VM, or VPN access) to reach private endpoints. The GitHub deployment workflow is configured for self-hosted runners labeled `vnet-connected`.
 
 ## Planned agents
 

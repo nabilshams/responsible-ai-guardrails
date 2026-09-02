@@ -7,6 +7,7 @@ from pathlib import Path
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
 from azure.core.credentials import TokenCredential
+from azure.core.exceptions import AzureError
 
 from .models import ExtractedDocument, TextRegion
 
@@ -26,7 +27,7 @@ class UnsupportedDocumentError(ValueError):
 
 
 class DocumentExtractor:
-    """Extracts plain text locally and complex document content with Azure Document Intelligence."""
+    """Extract text locally or use Azure Document Intelligence for complex files."""
 
     def __init__(
         self,
@@ -39,7 +40,12 @@ class DocumentExtractor:
             else None
         )
 
-    def extract(self, content: bytes, content_type: str, filename: str = "document") -> ExtractedDocument:
+    def extract(
+        self,
+        content: bytes,
+        content_type: str,
+        filename: str = "document",
+    ) -> ExtractedDocument:
         suffix = Path(filename).suffix.casefold()
         if content_type in _TEXT_TYPES or suffix in _TEXT_SUFFIXES:
             try:
@@ -51,11 +57,14 @@ class DocumentExtractor:
                 "Complex documents and images require AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"
             )
 
-        poller = self._client.begin_analyze_document(
-            "prebuilt-layout",
-            AnalyzeDocumentRequest(bytes_source=content),
-        )
-        result = poller.result()
+        try:
+            poller = self._client.begin_analyze_document(
+                "prebuilt-layout",
+                AnalyzeDocumentRequest(bytes_source=content),
+            )
+            result = poller.result()
+        except AzureError as exc:
+            raise RuntimeError("Azure Document Intelligence request failed") from exc
         regions: list[TextRegion] = []
         page_width: float | None = None
         page_height: float | None = None
@@ -66,11 +75,7 @@ class DocumentExtractor:
             for word in page.words or []:
                 if not word.span or not word.polygon:
                     continue
-                polygon = tuple(
-                    coordinate
-                    for point in word.polygon
-                    for coordinate in (float(point.x), float(point.y))
-                )
+                polygon = tuple(float(coordinate) for coordinate in word.polygon)
                 regions.append(
                     TextRegion(
                         offset=int(word.span.offset),
