@@ -15,6 +15,7 @@ from starlette.responses import JSONResponse, StreamingResponse
 
 from agents.document_redaction.factory import create_service
 from shared.guardrails.documents import UnsupportedDocumentError
+from shared.guardrails.native_document_pii import NativeDocumentRedactionResult
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -52,7 +53,15 @@ async def handle_invoke(request: Request) -> JSONResponse | StreamingResponse:
             language=str(data.get("language") or service.settings.pii_default_language),
             correlation_id=str(request.state.invocation_id),
         )
-        payload = result.model_dump()
+        if isinstance(result, NativeDocumentRedactionResult):
+            payload = {
+                "redacted_document_base64": base64.b64encode(result.content).decode("ascii"),
+                "content_type": result.content_type,
+                "filename": result.filename,
+                "correlation_id": result.correlation_id,
+            }
+        else:
+            payload = result.model_dump()
     except (
         UnicodeDecodeError,
         json.JSONDecodeError,

@@ -7,11 +7,15 @@ License: MIT
 Requires-Python: >=3.11
 Description-Content-Type: text/markdown
 Requires-Dist: azure-ai-agentserver-invocations>=1.1.0b1
+Requires-Dist: azure-ai-documentintelligence>=1.0.2
 Requires-Dist: azure-ai-textanalytics>=5.3.0
 Requires-Dist: azure-identity>=1.20.0
+Requires-Dist: azure-storage-blob>=12.26.0
 Requires-Dist: fastapi>=0.115.0
 Requires-Dist: httpx>=0.27.0
 Requires-Dist: opentelemetry-instrumentation-fastapi>=0.50b0
+Requires-Dist: pillow>=11.1.0
+Requires-Dist: pypdf>=5.1.0
 Requires-Dist: pydantic>=2.10.0
 Requires-Dist: pydantic-settings>=2.7.0
 Requires-Dist: uvicorn[standard]>=0.34.0
@@ -26,7 +30,7 @@ Requires-Dist: ruff>=0.9.0; extra == "dev"
 
 # Responsible AI Guardrails
 
-Enterprise-ready Responsible AI guardrails and hosted agents for Microsoft Foundry. The first implementation is a privacy-first **PII Redaction Agent** for text, prompts, and model responses.
+Enterprise-ready Responsible AI guardrails and hosted agents for Microsoft Foundry. The implementation separates text, document, and image redaction into independently deployable specialists.
 
 > This accelerator reduces risk; it does not guarantee that every sensitive value will be detected. Validate against your languages, jurisdictions, and policies before production use.
 
@@ -35,7 +39,9 @@ Enterprise-ready Responsible AI guardrails and hosted agents for Microsoft Found
 - Azure AI Language contextual PII detection as the only detection backend.
 - Text categories supported by Azure AI Language, including names, contact details, addresses, and identity information.
 - Deterministic overlap handling and irreversible token or mask replacement.
-- Dedicated endpoints for prompts and AI-generated responses.
+- PII Redaction Agent for text, prompts, and AI-generated responses.
+- Document Redaction Agent using Azure AI Language document-based PII for layout-preserving `.txt`, `.pdf`, and `.docx` output. Structured UTF-8 `.csv`, `.json`, `.xml`, `.md`, and `.log` inputs use the existing redacted-text path.
+- Image Redaction Agent using Document Intelligence OCR geometry and Azure AI Language PII detection to burn masks into a redacted PNG.
 - Microsoft Foundry Invocations-protocol hosting without sending PII to a generative model.
 - Privacy-safe logs: category names, counts, status, and correlation IDs only.
 - Synthetic evaluation data, offline unit tests, CI security checks, and OIDC deployment.
@@ -45,8 +51,10 @@ Enterprise-ready Responsible AI guardrails and hosted agents for Microsoft Found
 ```text
 agents/                         Hosted adapters and agent-specific contracts
   pii_redaction/                Implemented PII Redaction Agent
+  document_redaction/           Implemented Document Redaction Agent
+  image_redaction/              Implemented Image Redaction Agent
   */README.md                   Planned specialist agents
-shared/guardrails/              Detection, policy, and redaction library
+shared/guardrails/              Detection, extraction, policy, and redaction library
 shared/evaluations/             Deterministic metrics and synthetic datasets
 tests/                          Unit and offline evaluation tests
 infra/                          Bicep infrastructure templates for private network deployment
@@ -83,9 +91,21 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/redact/text -Conten
 
 For the Microsoft Foundry hosted-agent inner loop, install dependencies and press **F5**. VS Code starts the Invocations host on port 8088 and opens Foundry Toolkit Agent Inspector.
 
+### Live document test executor
+
+The sequential live executor reads visibly synthetic `.txt`, `.csv`, `.json`, `.xml`, `.md`, and `.log` files from `samples/input`, invokes the deployed Document Redaction Agent once per file, and writes redacted text to `samples/output` using the same filename.
+
+Authenticate with an Azure identity that can invoke the hosted agent and set `AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT` to its full Invocations endpoint. Then run:
+
+```powershell
+python -m scripts.live_document_executor
+```
+
+Use `--file synthetic.txt` to process one selected file and `--overwrite` to replace an existing output. Input and output contents and filenames are not logged. See [`samples/README.md`](./samples/README.md) for details.
+
 ## Azure mode
 
-Configure `AZURE_AI_LANGUAGE_ENDPOINT`. Authentication uses `DefaultAzureCredential`; do not configure service keys. In Azure, assign the hosted workload identity the Cognitive Services User data-plane role on Azure AI Language.
+Configure `AZURE_AI_LANGUAGE_ENDPOINT` for every agent and `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` for document and image agents. Authentication uses `DefaultAzureCredential`; do not configure service keys. Assign each hosted workload identity only the Cognitive Services User data-plane roles required by that specialist.
 
 ### Infrastructure Provisioning
 
@@ -104,10 +124,9 @@ See [`infra/README.md`](./infra/README.md) for architecture details and [`docs/d
 
 **Important**: Deployment requires a VNet-connected execution environment (self-hosted runner, Azure VM, or VPN access) to reach private endpoints. The GitHub deployment workflow is configured for self-hosted runners labeled `vnet-connected`.
 
-## Planned agents
+## Additional planned agents
 
 - PII Detection Agent
-- Image Redaction Agent
 - Content Safety Agent
 - Prompt Injection Detection Agent
 - Secret & Credential Detection Agent

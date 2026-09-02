@@ -1,0 +1,59 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 1397 >>
+stream
+0.12 0.31 0.47 rg 54 720 504 54 re f
+1 1 1 rg BT /F2 20 Tf 72 748 Td (Synthetic PII Redaction Test) Tj ET
+0.75 0 0 rg BT /F2 12 Tf 72 700 Td (SYNTHETIC TEST DATA - NOT A REAL PERSON) Tj ET
+0.15 0.15 0.15 rg BT /F1 10 Tf 72 675 Td (Every value in this fixture is fictional and reserved for testing.) Tj ET
+0.88 0.93 0.97 rg 72 633 150 24 re f
+0.2 0.2 0.2 rg BT /F2 10 Tf 82 641 Td (Full name) Tj ET
+0.1 0.1 0.1 rg BT /F1 10 Tf 238 641 Td (Avery Example) Tj ET
+0.88 0.93 0.97 rg 72 595 150 24 re f
+0.2 0.2 0.2 rg BT /F2 10 Tf 82 603 Td (Email) Tj ET
+0.1 0.1 0.1 rg BT /F1 10 Tf 238 603 Td (avery.example@example.test) Tj ET
+0.88 0.93 0.97 rg 72 557 150 24 re f
+0.2 0.2 0.2 rg BT /F2 10 Tf 82 565 Td (Phone) Tj ET
+0.1 0.1 0.1 rg BT /F1 10 Tf 238 565 Td (+1-202-555-0147) Tj ET
+0.88 0.93 0.97 rg 72 519 150 24 re f
+0.2 0.2 0.2 rg BT /F2 10 Tf 82 527 Td (Address) Tj ET
+0.1 0.1 0.1 rg BT /F1 10 Tf 238 527 Td (123 Example Street, Testville, CA 00000) Tj ET
+0.88 0.93 0.97 rg 72 481 150 24 re f
+0.2 0.2 0.2 rg BT /F2 10 Tf 82 489 Td (Government ID) Tj ET
+0.1 0.1 0.1 rg BT /F1 10 Tf 238 489 Td (000-12-3456) Tj ET
+0.88 0.93 0.97 rg 72 443 150 24 re f
+0.2 0.2 0.2 rg BT /F2 10 Tf 82 451 Td (Payment card) Tj ET
+0.1 0.1 0.1 rg BT /F1 10 Tf 238 451 Td (4111 1111 1111 1111) Tj ET
+0.2 0.2 0.2 rg BT /F1 9 Tf 72 406 Td (Expected behavior: sensitive fields are replaced by configured redaction tokens.) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000257 00000 n 
+0000001705 00000 n 
+0000001775 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+1850
+%%EOF

@@ -26,13 +26,29 @@ class Settings(BaseSettings):
 
     azure_ai_language_endpoint: str | None = None
     azure_document_intelligence_endpoint: str | None = None
+    azure_document_pii_storage_endpoint: str | None = None
+    azure_document_pii_source_container: str = "pii-source"
+    azure_document_pii_target_container: str = "pii-target"
+    azure_document_pii_api_version: str = "2026-05-01"
+    document_pii_redaction_character: str = "*"
+    document_pii_poll_interval_seconds: float = Field(default=1.0, ge=1.0, le=30.0)
+    document_pii_request_timeout_seconds: float = Field(default=30.0, ge=5.0, le=120.0)
+    document_pii_job_timeout_seconds: float = Field(default=180.0, ge=30.0, le=600.0)
 
     @field_validator(
         "azure_ai_language_endpoint",
         "azure_document_intelligence_endpoint",
+        "azure_document_pii_storage_endpoint",
     )
     @classmethod
     def require_https(cls, value: str | None) -> str | None:
         if value and not value.startswith("https://"):
             raise ValueError("Azure service endpoints must use HTTPS")
         return value.rstrip("/") if value else None
+
+    @field_validator("document_pii_redaction_character")
+    @classmethod
+    def require_supported_redaction_character(cls, value: str) -> str:
+        if value not in set("!#$%&*+-=?@^_~"):
+            raise ValueError("Unsupported document PII redaction character")
+        return value

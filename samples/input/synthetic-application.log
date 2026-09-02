@@ -1,0 +1,4 @@
+2026-01-15T12:00:00Z level=INFO fixture=synthetic real_person=false message="SYNTHETIC TEST DATA"
+2026-01-15T12:00:01Z level=INFO name="Synthetic Person Zeta" email=synthetic.zeta@example.test
+2026-01-15T12:00:02Z level=INFO phone=+1-202-555-0105 source_ip=198.51.100.77
+2026-01-15T12:00:03Z level=INFO address="987 Mockingbird Way, Fiction City, ZZ 00000"

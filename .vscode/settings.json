@@ -7,5 +7,10 @@
   "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
   "files.exclude": {
     "**/__pycache__": true
+  },
+  "chat.tools.terminal.autoApprove": {
+    ".\\.venv\\Scripts\\python.exe": true,
+    "Write-Error": true,
+    "&": true
   }
 }

@@ -1,0 +1,6 @@
+usage: live_document_executor.py [-h] [--input-dir INPUT_DIR]
+                                 [--output-dir OUTPUT_DIR] [--file FILE]
+                                 [--endpoint ENDPOINT] [--max-bytes MAX_BYTES]
+                                 [--timeout-seconds TIMEOUT_SECONDS]
+                                 [--overwrite]
+live_document_executor.py: error: unrecognized arguments: synthetic-pii-form.pdf samples/input samples/output

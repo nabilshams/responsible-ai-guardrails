@@ -10,7 +10,7 @@ Enterprise-ready Responsible AI guardrails and hosted agents for Microsoft Found
 - Text categories supported by Azure AI Language, including names, contact details, addresses, and identity information.
 - Deterministic overlap handling and irreversible token or mask replacement.
 - PII Redaction Agent for text, prompts, and AI-generated responses.
-- Document Redaction Agent supporting UTF-8 `.txt`, `.csv`, `.json`, `.xml`, `.md`, and `.log` files directly, with Azure Document Intelligence extraction for complex formats and Azure AI Language PII detection; output is redacted extracted text rather than a rewritten PDF or Office binary.
+- Document Redaction Agent using Azure AI Language document-based PII for layout-preserving `.txt`, `.pdf`, and `.docx` output. Structured UTF-8 `.csv`, `.json`, `.xml`, `.md`, and `.log` inputs use the existing redacted-text path.
 - Image Redaction Agent using Document Intelligence OCR geometry and Azure AI Language PII detection to burn masks into a redacted PNG.
 - Microsoft Foundry Invocations-protocol hosting without sending PII to a generative model.
 - Privacy-safe logs: category names, counts, status, and correlation IDs only.
@@ -60,6 +60,18 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/redact/text -Conten
 ```
 
 For the Microsoft Foundry hosted-agent inner loop, install dependencies and press **F5**. VS Code starts the Invocations host on port 8088 and opens Foundry Toolkit Agent Inspector.
+
+### Live document test executor
+
+The sequential live executor reads visibly synthetic `.txt`, `.csv`, `.json`, `.xml`, `.md`, and `.log` files from `samples/input`, invokes the deployed Document Redaction Agent once per file, and writes redacted text to `samples/output` using the same filename.
+
+Authenticate with an Azure identity that can invoke the hosted agent and set `AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT` to its full Invocations endpoint. Then run:
+
+```powershell
+python -m scripts.live_document_executor
+```
+
+Use `--file synthetic.txt` to process one selected file and `--overwrite` to replace an existing output. Input and output contents and filenames are not logged. See [`samples/README.md`](./samples/README.md) for details.
 
 ## Azure mode
 

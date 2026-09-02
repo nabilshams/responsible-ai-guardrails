@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<syntheticFixture realPerson="false">
+  <notice>SYNTHETIC TEST DATA — NOT A REAL PERSON</notice>
+  <customer>
+    <name>Synthetic Person Delta</name>
+    <email>synthetic.delta@example.test</email>
+    <phone>+1-202-555-0103</phone>
+    <address>321 Placeholder Boulevard, Example City, ZZ 00000</address>
+    <ipAddress>203.0.113.42</ipAddress>
+  </customer>
+  <purpose>PII-redaction testing only</purpose>
+</syntheticFixture>

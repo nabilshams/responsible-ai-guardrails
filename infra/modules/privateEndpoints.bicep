@@ -12,6 +12,7 @@ param aiServicesId string
 param aiLanguageId string
 param docIntelligenceId string
 param amplsId string
+param documentStorageId string
 
 // Private DNS zone IDs for linking
 param cognitiveServicesDnsZoneId string
@@ -21,6 +22,7 @@ param monitorDnsZoneId string
 param omsDnsZoneId string
 param odsDnsZoneId string
 param agentSvcDnsZoneId string
+param blobDnsZoneId string
 
 // Private endpoint for AI Services (Foundry hub)
 resource aiServicesPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
@@ -204,7 +206,45 @@ resource amplsPrivateEndpointDnsGroup 'Microsoft.Network/privateEndpoints/privat
   }
 }
 
+resource documentStoragePrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
+  name: 'pe-document-storage'
+  location: location
+  tags: tags
+  properties: {
+    subnet: {
+      id: peSubnetId
+    }
+    privateLinkServiceConnections: [
+      {
+        name: 'document-storage-connection'
+        properties: {
+          privateLinkServiceId: documentStorageId
+          groupIds: [
+            'blob'
+          ]
+        }
+      }
+    ]
+  }
+}
+
+resource documentStoragePrivateEndpointDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
+  parent: documentStoragePrivateEndpoint
+  name: 'default'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'blob-config'
+        properties: {
+          privateDnsZoneId: blobDnsZoneId
+        }
+      }
+    ]
+  }
+}
+
 output aiServicesPrivateEndpointId string = aiServicesPrivateEndpoint.id
 output aiLanguagePrivateEndpointId string = aiLanguagePrivateEndpoint.id
 output docIntelligencePrivateEndpointId string = docIntelligencePrivateEndpoint.id
 output amplsPrivateEndpointId string = amplsPrivateEndpoint.id
+output documentStoragePrivateEndpointId string = documentStoragePrivateEndpoint.id

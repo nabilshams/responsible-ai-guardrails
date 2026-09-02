@@ -1,5 +1,5 @@
 // Monitoring infrastructure: Log Analytics, Application Insights, Azure Monitor Private Link Scope
-// Configured for private-only ingestion where supported
+// Ingestion remains private; authenticated queries are available to portal experiences.
 
 targetScope = 'resourceGroup'
 
@@ -20,7 +20,7 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
     }
     retentionInDays: 30
     publicNetworkAccessForIngestion: 'Disabled'
-    publicNetworkAccessForQuery: 'Disabled'
+    publicNetworkAccessForQuery: 'Enabled'
   }
 }
 
@@ -34,7 +34,7 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
     Application_Type: 'web'
     WorkspaceResourceId: logAnalytics.id
     publicNetworkAccessForIngestion: 'Disabled'
-    publicNetworkAccessForQuery: 'Disabled'
+    publicNetworkAccessForQuery: 'Enabled'
   }
 }
 

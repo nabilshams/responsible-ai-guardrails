@@ -66,6 +66,7 @@ var resourceNames = {
   aiProject: 'aiproj-${environmentName}'
   aiLanguage: take('${abbrs.cognitiveServicesAccounts}language-${environmentName}-${uniqueSuffix}', 64)
   docIntelligence: take('${abbrs.cognitiveServicesAccounts}docintel-${environmentName}-${uniqueSuffix}', 64)
+  documentStorage: take('st${normalizedEnvironmentName}${uniqueSuffix}', 24)
   logAnalytics: '${abbrs.operationalInsightsWorkspaces}${environmentName}'
   appInsights: '${abbrs.insightsComponents}${environmentName}'
   ampls: 'ampls-${environmentName}'
@@ -122,6 +123,16 @@ module acr 'modules/acr.bicep' = {
   }
 }
 
+// Temporary source and target containers required by Azure AI Language document-based PII.
+module documentStorage 'modules/documentStorage.bicep' = {
+  name: 'document-storage-deployment'
+  params: {
+    location: location
+    tags: tags
+    storageAccountName: resourceNames.documentStorage
+  }
+}
+
 // Microsoft Foundry AI Services, Azure AI Language, and Document Intelligence
 module ai 'modules/ai.bicep' = {
   name: 'ai-deployment'
@@ -160,6 +171,7 @@ module privateEndpoints 'modules/privateEndpoints.bicep' = {
     aiLanguageId: ai.outputs.aiLanguageId
     docIntelligenceId: ai.outputs.docIntelligenceId
     amplsId: monitoring.outputs.amplsId
+    documentStorageId: documentStorage.outputs.storageAccountId
     // Private DNS zone IDs
     cognitiveServicesDnsZoneId: dns.outputs.cognitiveServicesDnsZoneId
     openaiDnsZoneId: dns.outputs.openaiDnsZoneId
@@ -168,6 +180,7 @@ module privateEndpoints 'modules/privateEndpoints.bicep' = {
     omsDnsZoneId: dns.outputs.omsDnsZoneId
     odsDnsZoneId: dns.outputs.odsDnsZoneId
     agentSvcDnsZoneId: dns.outputs.agentSvcDnsZoneId
+    blobDnsZoneId: dns.outputs.blobDnsZoneId
   }
 }
 
@@ -191,6 +204,8 @@ module rbac 'modules/rbac.bicep' = {
   params: {
     acrId: acr.outputs.acrId
     projectPrincipalId: foundryProject.outputs.aiProjectPrincipalId
+    documentStorageId: documentStorage.outputs.storageAccountId
+    aiLanguagePrincipalId: ai.outputs.aiLanguageSystemPrincipalId
   }
 }
 
@@ -208,6 +223,10 @@ output AZURE_AI_LANGUAGE_ENDPOINT string = ai.outputs.aiLanguageEndpoint
 output AZURE_AI_LANGUAGE_RESOURCE_ID string = ai.outputs.aiLanguageId
 output AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT string = ai.outputs.docIntelligenceEndpoint
 output AZURE_DOCUMENT_INTELLIGENCE_RESOURCE_ID string = ai.outputs.docIntelligenceId
+output AZURE_DOCUMENT_PII_STORAGE_ENDPOINT string = documentStorage.outputs.blobEndpoint
+output AZURE_DOCUMENT_PII_STORAGE_RESOURCE_ID string = documentStorage.outputs.storageAccountId
+output AZURE_DOCUMENT_PII_SOURCE_CONTAINER string = documentStorage.outputs.sourceContainerName
+output AZURE_DOCUMENT_PII_TARGET_CONTAINER string = documentStorage.outputs.targetContainerName
 
 // Container registry
 output AZURE_CONTAINER_REGISTRY_RESOURCE_ID string = acr.outputs.acrId

@@ -1,0 +1,9 @@
+SYNTHETIC TEST DATA — NOT A REAL PERSON
+
+Profile: Synthetic Person Alpha
+Email: synthetic.alpha@example.test
+Phone: +1-202-555-0100
+Address: 123 Example Avenue, Testville, ZZ 00000
+IP address: 192.0.2.10
+
+Purpose: deterministic PII-redaction testing only.

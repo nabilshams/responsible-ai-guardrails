@@ -22,6 +22,9 @@ infra/modules/*.json
 
 # Generated redaction outputs
 outputs/
+samples/input/*
+!samples/input/synthetic-*
+samples/output/*
 *.redacted.png
 *.redacted.txt
 

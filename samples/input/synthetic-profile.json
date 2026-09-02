@@ -1,0 +1,11 @@
+{
+  "fixture_notice": "SYNTHETIC TEST DATA — NOT A REAL PERSON",
+  "profile": {
+    "name": "Synthetic Person Gamma",
+    "email": "synthetic.gamma@example.test",
+    "phone": "+1-202-555-0102",
+    "address": "789 Fictional Road, Demo Town, ZZ 00000",
+    "ip_address": "198.51.100.25"
+  },
+  "purpose": "PII-redaction testing only"
+}

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 
 from azure.identity import DefaultAzureCredential
 
@@ -12,10 +13,13 @@ from .config import Settings
 from .documents import DocumentExtractor
 from .images import ImageRedactor
 from .models import RedactionResult
+from .native_document_pii import NativeDocumentPiiRedactor, NativeDocumentRedactionResult
 from .redactor import normalize_entities
 from .service import PiiRedactionService
 
 logger = logging.getLogger(__name__)
+
+_NATIVE_DOCUMENT_SUFFIXES = {".txt", ".pdf", ".docx"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +65,51 @@ class DocumentRedactionService:
         return self.pii_service.redact(
             document.text,
             language=language,
+            correlation_id=correlation_id,
+        )
+
+
+class DocumentAgentService:
+    """Select the layout-preserving native or structured-text redaction path."""
+
+    def __init__(
+        self,
+        settings: Settings | None = None,
+        *,
+        native_redactor: NativeDocumentPiiRedactor | None = None,
+        text_service: DocumentRedactionService | None = None,
+    ) -> None:
+        self.settings = settings or Settings()
+        credential = DefaultAzureCredential(exclude_interactive_browser_credential=True)
+        self.native_redactor = native_redactor or NativeDocumentPiiRedactor(
+            self.settings,
+            credential,
+        )
+        self.text_service = text_service or DocumentRedactionService(self.settings)
+
+    def redact(
+        self,
+        content: bytes,
+        content_type: str,
+        filename: str,
+        *,
+        language: str | None = None,
+        correlation_id: str | None = None,
+    ) -> RedactionResult | NativeDocumentRedactionResult:
+        selected_language = language or self.settings.pii_default_language
+        if Path(filename).suffix.casefold() in _NATIVE_DOCUMENT_SUFFIXES:
+            return self.native_redactor.redact(
+                content,
+                content_type,
+                filename,
+                language=selected_language,
+                correlation_id=correlation_id,
+            )
+        return self.text_service.redact(
+            content,
+            content_type,
+            filename,
+            language=selected_language,
             correlation_id=correlation_id,
         )
 

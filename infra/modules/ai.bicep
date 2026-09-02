@@ -194,6 +194,7 @@ output aiServicesSystemPrincipalId string = aiServices.identity.principalId
 output aiLanguageId string = aiLanguage.id
 output aiLanguageName string = aiLanguage.name
 output aiLanguageEndpoint string = aiLanguage.properties.endpoint
+output aiLanguageSystemPrincipalId string = aiLanguage.identity.principalId
 output docIntelligenceId string = docIntelligence.id
 output docIntelligenceName string = docIntelligence.name
 output docIntelligenceEndpoint string = docIntelligence.properties.endpoint

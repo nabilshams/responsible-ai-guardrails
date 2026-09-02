@@ -139,6 +139,24 @@ resource agentSvcDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLi
   }
 }
 
+resource blobDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
+  name: 'privatelink.blob.${environment().suffixes.storage}'
+  location: 'global'
+  tags: tags
+}
+
+resource blobDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
+  parent: blobDnsZone
+  name: 'blob-vnet-link'
+  location: 'global'
+  properties: {
+    registrationEnabled: false
+    virtualNetwork: {
+      id: vnetId
+    }
+  }
+}
+
 output cognitiveServicesDnsZoneId string = cognitiveServicesDnsZone.id
 output openaiDnsZoneId string = openaiDnsZone.id
 output aiServicesDnsZoneId string = aiServicesDnsZone.id
@@ -146,3 +164,4 @@ output monitorDnsZoneId string = monitorDnsZone.id
 output omsDnsZoneId string = omsDnsZone.id
 output odsDnsZoneId string = odsDnsZone.id
 output agentSvcDnsZoneId string = agentSvcDnsZone.id
+output blobDnsZoneId string = blobDnsZone.id
