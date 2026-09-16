@@ -5,8 +5,9 @@
 1. Create `.venv` and install `requirements-dev.txt`.
 2. Copy `.env.example` to `.env`.
 3. Configure `AZURE_AI_LANGUAGE_ENDPOINT` for all agents and `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` for document/image agents; authentication uses `DefaultAzureCredential`.
-4. Select the desired specialist debug profile and press F5 to start its Invocations protocol host on port 8088 and open Agent Inspector.
-5. Run `python -m agents.pii_redaction.run_api` for the optional REST adapter on port 8000.
+4. Hosted-agent images are built remotely by Azure Container Registry Tasks. A local Docker daemon is not required.
+5. Select the desired specialist debug profile and press F5 to start its Invocations protocol host on port 8088 and open Agent Inspector.
+6. Run `python -m agents.pii_redaction.run_api` for the optional REST adapter on port 8000.
 
 ## Azure Infrastructure Provisioning
 

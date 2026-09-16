@@ -15,10 +15,13 @@ services:
     displayName: PII Redaction Agent
     description: Detects PII with Azure AI Language and redacts text, prompts, and responses.
     project: .
-    language: python
-    codeConfiguration:
-      runtime: python_3_13
-      entryPoint: agents/pii_redaction/main.py
+    language: docker
+    docker:
+      path: Dockerfile
+      context: .
+      remoteBuild: true
+      buildArgs:
+        - AGENT_MODULE=agents.pii_redaction.main
     uses:
       - ai-project
     protocols:
@@ -43,10 +46,13 @@ services:
     displayName: Document Redaction Agent
     description: Redacts native documents with Azure AI Language document-based PII while preserving layout.
     project: .
-    language: python
-    codeConfiguration:
-      runtime: python_3_13
-      entryPoint: agents/document_redaction/main.py
+    language: docker
+    docker:
+      path: Dockerfile
+      context: .
+      remoteBuild: true
+      buildArgs:
+        - AGENT_MODULE=agents.document_redaction.main
     uses:
       - ai-project
     protocols:
@@ -74,10 +80,13 @@ services:
     displayName: Image Redaction Agent
     description: Masks image pixels containing PII using Azure Document Intelligence OCR and Azure AI Language.
     project: .
-    language: python
-    codeConfiguration:
-      runtime: python_3_13
-      entryPoint: agents/image_redaction/main.py
+    language: docker
+    docker:
+      path: Dockerfile
+      context: .
+      remoteBuild: true
+      buildArgs:
+        - AGENT_MODULE=agents.image_redaction.main
     uses:
       - ai-project
     protocols:

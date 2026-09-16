@@ -88,7 +88,7 @@ azd provision --preview
 # Provision infrastructure (creates resource group and all resources)
 azd provision
 
-# Deploy the agent (builds image, pushes to ACR, deploys to Foundry)
+# Deploy the agents (builds remotely in ACR and deploys to Foundry; no local Docker required)
 azd deploy
 ```
 
