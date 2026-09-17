@@ -48,7 +48,48 @@ Run offline tests before changing redaction behavior:
 
 Place authorized files directly in [samples/input](samples/input). Do not place nested directories there. The standard executor processes one file at a time and writes the response to [samples/output](samples/output) using the same filename.
 
-### Required RBAC
+### Developer Access To Hosted Agents
+
+A public agent endpoint is network-reachable but does not allow anonymous invocation. Every developer must authenticate with Microsoft Entra ID and have the **Foundry Agent Consumer** role. This is separate from the runtime identity permissions described below.
+
+Use the narrowest appropriate scope:
+
+- **One agent:** Assign the role at that agent's scope. This is the recommended option for developers who need only one endpoint.
+- **All agents in this project:** Assign the role at the Foundry project scope.
+
+A developer can assign this role to themselves only when they already have permission to create Azure role assignments, such as **Owner**, **User Access Administrator**, or **Role Based Access Control Administrator** at the applicable scope. Otherwise, an authorized administrator must run the command for them.
+
+Authenticate and assign access to only the Document Redaction Agent:
+
+```powershell
+az login
+
+$developerObjectId = az ad signed-in-user show --query id --output tsv
+$projectScope = azd env get-value AZURE_AI_PROJECT_ID
+$agentScope = "$projectScope/agents/document-redaction-agent"
+
+az role assignment create `
+  --assignee-object-id $developerObjectId `
+  --assignee-principal-type User `
+  --role "Foundry Agent Consumer" `
+  --scope $agentScope `
+  --output none
+```
+
+To allow the developer to invoke every hosted agent in this Foundry project, use the project scope instead:
+
+```powershell
+az role assignment create `
+  --assignee-object-id $developerObjectId `
+  --assignee-principal-type User `
+  --role "Foundry Agent Consumer" `
+  --scope $projectScope `
+  --output none
+```
+
+Role assignments can take several minutes to propagate. The developer must run `az login` as the same identity before invoking an agent through the scripts in this repository. Do not grant **Owner** or **Contributor** merely to invoke an agent.
+
+### Agent Runtime RBAC
 
 The Document Redaction Agent's hosted runtime identity requires these resource-scoped assignments after `azd deploy`:
 
@@ -155,7 +196,7 @@ After loading the environment in PowerShell, run:
 | --- | --- |
 | `Set AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT` | Load the `responsibleai` azd environment or provide `--endpoint`. |
 | `HTTP 401` or `HTTP 403` | Run `az login` with an identity authorized to invoke the hosted agent. |
-| `HTTP 422` with `HTTP 401 (PermissionDenied)` | Assign `Cognitive Services User` on Azure AI Language and `Storage Blob Data Contributor` on temporary document Storage to the Document Agent's `instance_identity.principal_id`, then allow time for RBAC propagation. |
+| `HTTP 422` with `HTTP 401 (PermissionDenied)` | Rerun `azd up`, or load `azd env get-values` into the process and run `scripts/configure_agent_rbac.py`; then allow time for RBAC propagation. |
 | `FileExistsError` | Use `--overwrite` or select a new output folder. |
 | Invalid native document response | Preserve the prior output, inspect the hosted-agent trace, and do not rename text or JSON output as PDF/DOCX. |
 | Cannot query traces | Verify Azure RBAC for telemetry query access and the configured Azure Monitor network path. |
@@ -200,7 +241,7 @@ azd provision --preview
 azd up --no-prompt
 ```
 
-After `azd up`, Bicep outputs and Foundry deployment outputs are persisted in the selected azd environment. A value-blind `postup` check verifies all required resource, configuration, and hosted-agent variables; use `azd env get-values` to inspect them locally.
+After `azd up`, Bicep outputs and Foundry deployment outputs are persisted in the selected azd environment. The `postup` hooks configure hosted-agent RBAC and verify all required variable names without displaying their values; use `azd env get-values` to inspect them locally.
 
 Use a fresh environment because Foundry network injection cannot be changed after account creation. The `S` and `S0` tiers incur usage charges. See [infra/README.md](infra/README.md#provision-without-a-vnet) for infrastructure-only deployment, retry steps, and enterprise Storage policy considerations.
 

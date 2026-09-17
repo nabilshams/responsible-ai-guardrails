@@ -110,4 +110,5 @@ infra:
   module: main
 hooks:
   postup:
-    run: scripts/validate_azd_environment.py
+    - run: scripts/configure_agent_rbac.py
+    - run: scripts/validate_azd_environment.py

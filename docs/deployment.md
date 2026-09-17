@@ -88,7 +88,7 @@ Do not change `USE_VNET` for an existing Foundry account. Hosted Agent network i
 
 ### Post-Deployment: Agent Identity RBAC
 
-Each runtime managed identity is created only during `azd deploy`. Grant resource-scoped access as follows:
+Each runtime managed identity is created only during `azd deploy`. The `azd up` `postup` hook runs `scripts/configure_agent_rbac.py` to check and create these resource-scoped assignments:
 
 | Hosted agent | Required role assignments |
 | --- | --- |
@@ -97,6 +97,20 @@ Each runtime managed identity is created only during `azd deploy`. Grant resourc
 | Image Redaction Agent | `Cognitive Services User` on Azure AI Language and Document Intelligence |
 
 `Cognitive Services Language Reader` does not authorize native document jobs; use `Cognitive Services User` as shown below.
+
+The hook is idempotent and does not display identity or resource IDs. Azure CLI must be installed and authenticated with permission to read and create role assignments. Run the hook again after a standalone `azd deploy`, which can create a new runtime identity:
+
+```powershell
+az login
+azd env get-values | ForEach-Object {
+   if ($_ -match '^([^=]+)="(.*)"$') {
+      [Environment]::SetEnvironmentVariable($matches[1], $matches[2], 'Process')
+   }
+}
+.\.venv\Scripts\python.exe scripts\configure_agent_rbac.py
+```
+
+If the automatic hook fails, recover the Document Redaction Agent assignments manually:
 
 ```powershell
 $agent = azd ai agent show document-redaction-agent --output json | ConvertFrom-Json
@@ -115,7 +129,7 @@ az role assignment create `
    --scope $environment["AZURE_DOCUMENT_PII_STORAGE_RESOURCE_ID"]
 ```
 
-Allow several minutes for RBAC propagation before testing. Repeat the assignments when a redeployment creates a new runtime principal ID.
+Allow several minutes for RBAC propagation before testing.
 
 ### Validation
 

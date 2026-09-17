@@ -165,7 +165,7 @@ Some enterprise Azure Policies force Storage public network access to `Disabled`
 
 ## Post-Deployment: Agent Identity RBAC
 
-The Bicep templates configure ACR pull access for the Foundry project identity and Storage access for the Azure AI Language identity. However, **each hosted agent's runtime identity is created only during `azd deploy`**, after infrastructure provisioning. Assign the following roles to each agent's `instance_identity.principal_id`:
+The Bicep templates configure ACR pull access for the Foundry project identity and Storage access for the Azure AI Language identity. Each hosted agent's runtime identity is created only during `azd deploy`, after infrastructure provisioning, so `azd up` runs `scripts/configure_agent_rbac.py` as a `postup` hook. The hook checks and creates these resource-scoped assignments without displaying identity or resource IDs:
 
 | Hosted agent | Resource scope | Built-in role |
 | --- | --- | --- |
@@ -177,7 +177,21 @@ The Bicep templates configure ACR pull access for the Foundry project identity a
 
 Use resource-level scopes rather than the resource group or subscription. `Cognitive Services Language Reader` does not include the native `/language/analyze-documents/jobs` operation and is not sufficient for PDF, DOCX, or TXT redaction.
 
-After `azd up`, grant the Document Redaction Agent its two required roles:
+The hook is idempotent. Azure CLI must be installed and authenticated with permission to read and create role assignments. After a standalone `azd deploy`, rerun the hook because a new agent version can have a new runtime identity:
+
+```powershell
+az login
+azd env get-values | ForEach-Object {
+  if ($_ -match '^([^=]+)="(.*)"$') {
+    [Environment]::SetEnvironmentVariable($matches[1], $matches[2], 'Process')
+  }
+}
+.\.venv\Scripts\python.exe scripts\configure_agent_rbac.py
+```
+
+### Manual recovery
+
+If the automatic hook cannot create role assignments, grant the Document Redaction Agent its two required roles manually:
 
 ```powershell
 # Resolve the deployed runtime identity and Bicep resource outputs.
@@ -202,7 +216,7 @@ az role assignment create `
   --output none
 ```
 
-Role assignments can take several minutes to propagate. An invocation made immediately afterward can return `HTTP 422` with an inner `HTTP 401 (PermissionDenied)`; retry after propagation completes. Re-run these assignments whenever redeployment creates a new `instance_identity.principal_id`.
+Role assignments can take several minutes to propagate. An invocation made immediately afterward can return `HTTP 422` with an inner `HTTP 401 (PermissionDenied)`; retry after propagation completes.
 
 ## Validation
 
