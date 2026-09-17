@@ -29,7 +29,7 @@ The Bicep templates provision:
 - **Container Registry**: Basic Azure Container Registry with public network access, admin user disabled, and Microsoft Entra RBAC
 - **Monitoring**: Application Insights and Log Analytics in both modes; Azure Monitor Private Link Scope in VNet mode
 - **Private DNS in VNet mode**: Private DNS zones linked to the VNet for automatic private endpoint resolution
-- **RBAC**: Foundry project identity receives ACR pull access; each agent runtime identity receives only its required Cognitive Services User assignments
+- **RBAC**: Foundry project identity receives ACR pull access; each agent runtime identity receives only its required Cognitive Services User and Storage Blob Data Contributor assignments
 
 See [`infra/README.md`](../infra/README.md) for detailed architecture and module reference.
 
@@ -88,24 +88,34 @@ Do not change `USE_VNET` for an existing Foundry account. Hosted Agent network i
 
 ### Post-Deployment: Agent Identity RBAC
 
-Each runtime managed identity is created only during `azd deploy`. Grant the PII agent access to Azure AI Language only. Grant the document and image agents access to both Azure AI Language and Document Intelligence.
+Each runtime managed identity is created only during `azd deploy`. Grant resource-scoped access as follows:
+
+| Hosted agent | Required role assignments |
+| --- | --- |
+| PII Redaction Agent | `Cognitive Services User` on Azure AI Language |
+| Document Redaction Agent | `Cognitive Services User` on Azure AI Language; `Storage Blob Data Contributor` on temporary document Storage |
+| Image Redaction Agent | `Cognitive Services User` on Azure AI Language and Document Intelligence |
+
+`Cognitive Services Language Reader` does not authorize native document jobs; use `Cognitive Services User` as shown below.
 
 ```powershell
-# Retrieve agent identity principal ID (from azd output or Foundry agent resource)
-$agentPrincipalId = "<agent-identity-principal-id>"
+$agent = azd ai agent show document-redaction-agent --output json | ConvertFrom-Json
+$environment = azd env get-values --output json | ConvertFrom-Json -AsHashtable
 
-# Cognitive Services User role (data-plane read)
-$roleId = "a97b65f3-24c7-4388-baec-2e87135dc908"
+az role assignment create `
+   --assignee-object-id $agent.instance_identity.principal_id `
+   --assignee-principal-type ServicePrincipal `
+   --role "Cognitive Services User" `
+   --scope $environment["AZURE_AI_LANGUAGE_RESOURCE_ID"]
 
-# Get resource IDs from azd environment
-$environment = azd env get-values --output json | ConvertFrom-Json
-$languageId = $environment.AZURE_AI_LANGUAGE_RESOURCE_ID
-
-# Assign roles
-az role assignment create --assignee $agentPrincipalId --role $roleId --scope $languageId
+az role assignment create `
+   --assignee-object-id $agent.instance_identity.principal_id `
+   --assignee-principal-type ServicePrincipal `
+   --role "Storage Blob Data Contributor" `
+   --scope $environment["AZURE_DOCUMENT_PII_STORAGE_RESOURCE_ID"]
 ```
 
-> **Note**: If the azd hosted-agent deployment flow supports automatic RBAC for agent identity, this step may be automated. Verify by testing agent invocations.
+Allow several minutes for RBAC propagation before testing. Repeat the assignments when a redeployment creates a new runtime principal ID.
 
 ### Validation
 

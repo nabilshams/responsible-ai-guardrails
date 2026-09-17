@@ -3,13 +3,19 @@ from __future__ import annotations
 import asyncio
 import base64
 import io
+import subprocess
 from pathlib import Path
 from typing import Any
 
 import pytest
 from pypdf import PdfWriter
 
-from scripts.live_document_executor import discover_input_files, execute, redact_file
+from scripts.live_document_executor import (
+    discover_input_files,
+    execute,
+    redact_file,
+    resolve_endpoint,
+)
 
 
 class StubDocumentAgentClient:
@@ -50,6 +56,77 @@ def valid_pdf() -> bytes:
     writer.add_blank_page(width=612, height=792)
     writer.write(output)
     return output.getvalue()
+
+
+def test_resolve_endpoint_prefers_explicit_value(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(
+        "AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT",
+        "https://environment.example.test/invocations",
+    )
+
+    endpoint = resolve_endpoint("https://explicit.example.test/invocations")
+
+    assert endpoint == "https://explicit.example.test/invocations"
+
+
+def test_resolve_endpoint_uses_process_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(
+        "AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT",
+        "https://environment.example.test/invocations",
+    )
+
+    assert resolve_endpoint() == "https://environment.example.test/invocations"
+
+
+def test_resolve_endpoint_uses_selected_azd_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(
+        "AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT",
+        raising=False,
+    )
+
+    def run_azd(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        assert command == [
+            "azd",
+            "env",
+            "get-value",
+            "AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT",
+            "--no-prompt",
+        ]
+        assert kwargs["env"]["AZURE_DEV_USER_AGENT"] == "microsoft_foundry_skill"
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="https://azd.example.test/invocations\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(subprocess, "run", run_azd)
+
+    assert resolve_endpoint() == "https://azd.example.test/invocations"
+
+
+def test_resolve_endpoint_reports_missing_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(
+        "AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0],
+            1,
+            stdout="",
+            stderr="synthetic azd failure",
+        ),
+    )
+
+    with pytest.raises(ValueError, match="select an azd environment"):
+        resolve_endpoint()
 
 
 @pytest.mark.parametrize(

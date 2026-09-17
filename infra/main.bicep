@@ -39,6 +39,14 @@ param aiLanguageSku string = 'F0'
 @description('Azure Document Intelligence SKU. F0 is for development; use S0 for production documents.')
 param docIntelligenceSku string = 'F0'
 
+@description('Minimum confidence required to redact a detected PII entity.')
+param piiConfidenceThreshold string = '0.7'
+
+@minLength(2)
+@maxLength(12)
+@description('Default language code used for PII detection.')
+param piiDefaultLanguage string = 'en'
+
 // ========== VARIABLES ==========
 
 var tags = {
@@ -209,6 +217,18 @@ module rbac 'modules/rbac.bicep' = {
 
 // ========== OUTPUTS (azd environment variables) ==========
 
+// Deployment context and selected options
+output AZURE_ENV_NAME string = environmentName
+output AZURE_LOCATION string = location
+output AZURE_SUBSCRIPTION_ID string = subscription().subscriptionId
+output AZURE_TENANT_ID string = tenant().tenantId
+output USE_VNET string = string(useVnet)
+output VNET_ADDRESS_PREFIX string = vnetAddressPrefix
+output AGENT_SUBNET_PREFIX string = agentSubnetPrefix
+output PE_SUBNET_PREFIX string = privateEndpointSubnetPrefix
+output AI_LANGUAGE_SKU string = aiLanguageSku
+output DOCUMENT_INTELLIGENCE_SKU string = docIntelligenceSku
+
 // AI Services endpoints
 output FOUNDRY_PROJECT_ENDPOINT string = foundryProject.outputs.aiProjectEndpoint
 output AZURE_AI_PROJECT_ENDPOINT string = foundryProject.outputs.aiProjectEndpoint
@@ -243,5 +263,5 @@ output AZURE_RESOURCE_GROUP string = resourceGroup().name
 
 // Environment config (agent configuration values)
 output ENABLE_CAPABILITY_HOST string = 'true'
-output PII_CONFIDENCE_THRESHOLD string = '0.7'
-output PII_DEFAULT_LANGUAGE string = 'en'
+output PII_CONFIDENCE_THRESHOLD string = piiConfidenceThreshold
+output PII_DEFAULT_LANGUAGE string = piiDefaultLanguage

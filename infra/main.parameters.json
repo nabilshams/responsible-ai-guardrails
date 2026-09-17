@@ -25,6 +25,12 @@
     },
     "docIntelligenceSku": {
       "value": "${DOCUMENT_INTELLIGENCE_SKU=F0}"
+    },
+    "piiConfidenceThreshold": {
+      "value": "${PII_CONFIDENCE_THRESHOLD=0.7}"
+    },
+    "piiDefaultLanguage": {
+      "value": "${PII_DEFAULT_LANGUAGE=en}"
     }
   }
 }

@@ -108,3 +108,6 @@ services:
 infra:
   path: infra
   module: main
+hooks:
+  postup:
+    run: scripts/validate_azd_environment.py

@@ -6,7 +6,7 @@ The repository includes synthetic fixtures for every supported format. Together 
 
 The executor sends files to the deployed Document Redaction Agent sequentially and writes each redacted response to `samples/output` with the same filename. TXT, PDF, and DOCX outputs retain their native format; other supported formats contain redacted UTF-8 text. Input and output files are ignored by Git to prevent accidental persistence of test content.
 
-Authenticate with Azure CLI or another `DefaultAzureCredential` source, then set `AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT` to the full deployed Invocations endpoint.
+Authenticate with Azure CLI or another `DefaultAzureCredential` source. The executor reads the endpoint from `--endpoint`, `AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT`, or the currently selected azd environment, in that order. A successful `azd up` stores the deployed endpoint in that environment automatically.
 
 Run all files:
 

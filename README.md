@@ -48,6 +48,17 @@ Run offline tests before changing redaction behavior:
 
 Place authorized files directly in [samples/input](samples/input). Do not place nested directories there. The standard executor processes one file at a time and writes the response to [samples/output](samples/output) using the same filename.
 
+### Required RBAC
+
+The Document Redaction Agent's hosted runtime identity requires these resource-scoped assignments after `azd deploy`:
+
+| Resource | Built-in role | Purpose |
+| --- | --- | --- |
+| Azure AI Language | Cognitive Services User | Submit and poll native document PII jobs |
+| Temporary document Storage account | Storage Blob Data Contributor | Upload source files and download/delete redacted artifacts |
+
+`Cognitive Services Language Reader` is not sufficient because it does not authorize the native `/language/analyze-documents/jobs` operation. See [infra/README.md](infra/README.md#post-deployment-agent-identity-rbac) for the assignment commands and the complete specialist-agent RBAC matrix.
+
 ### PowerShell
 
 Load the active `responsibleai` environment into the current terminal without printing endpoint values:
@@ -66,6 +77,8 @@ foreach ($item in $values.GetEnumerator()) {
 ```
 
 Redact one PDF and replace an existing output with the same name:
+
+The executor resolves the deployed endpoint from `--endpoint`, then from `AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT`, and finally from the currently selected azd environment. After `azd up`, no manual endpoint export is required as long as the deployed environment remains selected.
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\live_document_executor.py `
@@ -142,7 +155,7 @@ After loading the environment in PowerShell, run:
 | --- | --- |
 | `Set AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT` | Load the `responsibleai` azd environment or provide `--endpoint`. |
 | `HTTP 401` or `HTTP 403` | Run `az login` with an identity authorized to invoke the hosted agent. |
-| `HTTP 422` | The hosted agent received the request but Azure AI Language document processing did not complete. Review the agent trace and verify Language and Storage managed-identity access. |
+| `HTTP 422` with `HTTP 401 (PermissionDenied)` | Assign `Cognitive Services User` on Azure AI Language and `Storage Blob Data Contributor` on temporary document Storage to the Document Agent's `instance_identity.principal_id`, then allow time for RBAC propagation. |
 | `FileExistsError` | Use `--overwrite` or select a new output folder. |
 | Invalid native document response | Preserve the prior output, inspect the hosted-agent trace, and do not rename text or JSON output as PDF/DOCX. |
 | Cannot query traces | Verify Azure RBAC for telemetry query access and the configured Azure Monitor network path. |
@@ -186,6 +199,8 @@ azd env set PII_DEFAULT_LANGUAGE "en"
 azd provision --preview
 azd up --no-prompt
 ```
+
+After `azd up`, Bicep outputs and Foundry deployment outputs are persisted in the selected azd environment. A value-blind `postup` check verifies all required resource, configuration, and hosted-agent variables; use `azd env get-values` to inspect them locally.
 
 Use a fresh environment because Foundry network injection cannot be changed after account creation. The `S` and `S0` tiers incur usage charges. See [infra/README.md](infra/README.md#provision-without-a-vnet) for infrastructure-only deployment, retry steps, and enterprise Storage policy considerations.
 

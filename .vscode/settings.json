@@ -13,6 +13,7 @@
     "Out-Null": true,
     "git check-ignore": true,
     "&": true,
-    "az": true
+    "az": true,
+    ".\\.venv\\Scripts\\python.exe": true
   }
 }

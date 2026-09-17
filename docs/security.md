@@ -10,7 +10,7 @@
 ## Required production controls
 
 - Disable public network access where supported and use private endpoints, private DNS, and egress allowlists.
-- Assign only Cognitive Services User/data-plane roles required by each specialist identity.
+- Assign `Cognitive Services User` only on the Cognitive Services resources each specialist calls. Additionally, grant the Document Redaction Agent `Storage Blob Data Contributor` on temporary document Storage; do not grant these roles at subscription scope.
 - Authenticate the REST adapter at the gateway or hosting layer; never expose it directly to the internet.
 - Store configuration in App Configuration and secrets in Key Vault. Prefer identity over keys.
 - Rate-limit by tenant and identity, and cap request size and processing time.

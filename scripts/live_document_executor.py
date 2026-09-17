@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import base64
 import os
+import subprocess
 import tempfile
 from collections.abc import Sequence
 from pathlib import Path
@@ -34,6 +35,37 @@ _ENDPOINT_VARIABLE = "AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT"
 
 class DocumentAgentClient(Protocol):
     async def invoke(self, payload: dict[str, Any]) -> dict[str, Any]: ...
+
+
+def resolve_endpoint(explicit_endpoint: str | None = None) -> str:
+    """Resolve the endpoint from an argument, process environment, or selected azd environment."""
+    endpoint = (explicit_endpoint or os.getenv(_ENDPOINT_VARIABLE, "")).strip()
+    if endpoint:
+        return endpoint
+
+    azd_environment = os.environ.copy()
+    azd_environment["AZURE_DEV_USER_AGENT"] = "microsoft_foundry_skill"
+    try:
+        result = subprocess.run(
+            ["azd", "env", "get-value", _ENDPOINT_VARIABLE, "--no-prompt"],
+            capture_output=True,
+            check=False,
+            env=azd_environment,
+            text=True,
+            timeout=30,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        result = None
+
+    if result is not None and result.returncode == 0:
+        endpoint = result.stdout.strip()
+        if endpoint:
+            return endpoint
+
+    raise ValueError(
+        f"Set {_ENDPOINT_VARIABLE}, pass --endpoint, or select an azd environment "
+        "where the Document Redaction Agent has been deployed"
+    )
 
 
 def discover_input_files(input_dir: Path, selected_file: Path | None = None) -> list[Path]:
@@ -164,7 +196,7 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         help="Process only this file from the input directory; otherwise process all files.",
     )
-    parser.add_argument("--endpoint", default=os.getenv(_ENDPOINT_VARIABLE, ""))
+    parser.add_argument("--endpoint")
     parser.add_argument("--max-bytes", type=int, default=_DEFAULT_MAX_BYTES)
     parser.add_argument("--timeout-seconds", type=float, default=180.0)
     parser.add_argument("--overwrite", action="store_true")
@@ -172,12 +204,11 @@ def _parser() -> argparse.ArgumentParser:
 
 
 async def _run(arguments: argparse.Namespace) -> int:
-    if not arguments.endpoint:
-        raise ValueError(f"Set {_ENDPOINT_VARIABLE} or pass --endpoint")
+    endpoint = resolve_endpoint(arguments.endpoint)
     credential = DefaultAzureCredential(exclude_interactive_browser_credential=True)
     try:
         client = LiveAgentClient(
-            arguments.endpoint,
+            endpoint,
             credential,
             timeout_seconds=arguments.timeout_seconds,
         )

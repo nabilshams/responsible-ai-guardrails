@@ -139,6 +139,14 @@ azd provision --preview
 azd up --no-prompt
 ```
 
+`azd up` now populates the selected azd environment in both phases:
+
+- `azd provision` writes Azure context, selected deployment settings, resource IDs, and service endpoints from Bicep outputs.
+- `azd deploy` writes each hosted agent's name, version, runtime identity, and invocation endpoint.
+- The `postup` hook validates the required variable names without printing their values. It fails the workflow if the environment handoff is incomplete.
+
+Defaults such as network prefixes, SKUs, `PII_CONFIDENCE_THRESHOLD`, and `PII_DEFAULT_LANGUAGE` are also emitted as outputs, so they appear in `azd env get-values` even when the user did not set them explicitly. Public deployments retain empty VNet resource IDs by design.
+
 To provision infrastructure without deploying the agents, replace the final command with:
 
 ```powershell
@@ -157,29 +165,44 @@ Some enterprise Azure Policies force Storage public network access to `Disabled`
 
 ## Post-Deployment: Agent Identity RBAC
 
-The Bicep templates configure ACR pull access for the Foundry project identity. However, **the hosted agent's runtime identity is created only during `azd deploy`**, after infrastructure provisioning.
+The Bicep templates configure ACR pull access for the Foundry project identity and Storage access for the Azure AI Language identity. However, **each hosted agent's runtime identity is created only during `azd deploy`**, after infrastructure provisioning. Assign the following roles to each agent's `instance_identity.principal_id`:
 
-Once deployed, grant the agent identity data-plane access to Azure AI Language:
+| Hosted agent | Resource scope | Built-in role |
+| --- | --- | --- |
+| PII Redaction Agent | Azure AI Language | Cognitive Services User |
+| Document Redaction Agent | Azure AI Language | Cognitive Services User |
+| Document Redaction Agent | Temporary document Storage account | Storage Blob Data Contributor |
+| Image Redaction Agent | Azure AI Language | Cognitive Services User |
+| Image Redaction Agent | Document Intelligence | Cognitive Services User |
+
+Use resource-level scopes rather than the resource group or subscription. `Cognitive Services Language Reader` does not include the native `/language/analyze-documents/jobs` operation and is not sufficient for PDF, DOCX, or TXT redaction.
+
+After `azd up`, grant the Document Redaction Agent its two required roles:
 
 ```powershell
-# Get the agent identity principal ID (from Foundry agent resource)
-$agentIdentityId = az ... # (azd may output this, or query the agent resource)
+# Resolve the deployed runtime identity and Bicep resource outputs.
+$agent = azd ai agent show document-redaction-agent --output json |
+    ConvertFrom-Json
+$agentIdentityId = [string]$agent.instance_identity.principal_id
+$environment = azd env get-values --output json |
+    ConvertFrom-Json -AsHashtable
 
-# Cognitive Services User role (data-plane read access)
-$cognitiveServicesUserRole = "a97b65f3-24c7-4388-baec-2e87135dc908"
-
-# Resource IDs are emitted by Bicep into the azd environment.
-$environment = azd env get-values --output json | ConvertFrom-Json
-
-# Grant access to AI Language
 az role assignment create `
-  --assignee $agentIdentityId `
-  --role $cognitiveServicesUserRole `
-  --scope $environment.AZURE_AI_LANGUAGE_RESOURCE_ID
+  --assignee-object-id $agentIdentityId `
+  --assignee-principal-type ServicePrincipal `
+  --role "Cognitive Services User" `
+  --scope $environment["AZURE_AI_LANGUAGE_RESOURCE_ID"] `
+  --output none
 
+az role assignment create `
+  --assignee-object-id $agentIdentityId `
+  --assignee-principal-type ServicePrincipal `
+  --role "Storage Blob Data Contributor" `
+  --scope $environment["AZURE_DOCUMENT_PII_STORAGE_RESOURCE_ID"] `
+  --output none
 ```
 
-> **Note**: If azd's hosted-agent deployment supports automatic RBAC assignment for agent identity, this step may be handled automatically. Verify by testing agent invocations.
+Role assignments can take several minutes to propagate. An invocation made immediately afterward can return `HTTP 422` with an inner `HTTP 401 (PermissionDenied)`; retry after propagation completes. Re-run these assignments whenever redeployment creates a new `instance_identity.principal_id`.
 
 ## Validation
 
@@ -236,7 +259,7 @@ Invoke-RestMethod -Method Post -Uri "https://your-agent-endpoint/invoke" `
 
 - **No secrets in source control**: All authentication uses managed identities or DefaultAzureCredential
 - **Explicit network posture**: `USE_VNET=true` makes Foundry and supporting data-plane services private; `USE_VNET=false` enables their public endpoints while retaining Microsoft Entra authentication and disabled shared-key access where supported
-- **Least privilege**: AI Services has only ACR pull; agent identity requires explicit Cognitive Services User assignment
+- **Least privilege**: The Foundry project identity has ACR pull; hosted runtime identities receive only the resource-scoped Cognitive Services User and Storage Blob Data Contributor roles listed above
 - **Audit logs**: All resources send diagnostics to Log Analytics
 - **Network isolation**: NSGs enforce minimal safe rules; egress to Azure services via service tags
 
