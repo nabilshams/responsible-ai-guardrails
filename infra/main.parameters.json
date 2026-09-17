@@ -21,10 +21,10 @@
       "value": "${PE_SUBNET_PREFIX=10.40.1.0/24}"
     },
     "aiLanguageSku": {
-      "value": "${AI_LANGUAGE_SKU=F0}"
+      "value": "${AI_LANGUAGE_SKU=S}"
     },
     "docIntelligenceSku": {
-      "value": "${DOCUMENT_INTELLIGENCE_SKU=F0}"
+      "value": "${DOCUMENT_INTELLIGENCE_SKU=S0}"
     },
     "piiConfidenceThreshold": {
       "value": "${PII_CONFIDENCE_THRESHOLD=0.7}"

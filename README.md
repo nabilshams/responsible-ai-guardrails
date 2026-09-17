@@ -15,6 +15,21 @@ This repository is an accelerator, not a guarantee that every sensitive value wi
 
 Native document redaction uploads each PDF, DOCX, or TXT file to private temporary Blob Storage, submits an asynchronous Azure AI Language job, retrieves the redacted native artifact, and attempts to delete temporary artifacts. A storage lifecycle rule provides fallback cleanup.
 
+## Architecture At A Glance
+
+```text
+agents/                         Hosted agent adapters
+  pii_redaction/                Text PII Redaction Agent
+  document_redaction/           Native and structured document redaction
+  image_redaction/              Image PII redaction
+shared/guardrails/              Detection, policies, document services, and native PII adapter
+scripts/                        Live invocation, executor, and synthetic-fixture utilities
+samples/                        Synthetic inputs and ignored local outputs
+tests/                          Offline and opt-in live tests
+infra/                          Bicep infrastructure templates
+docs/                           Architecture, security, evaluation, and deployment guidance
+```
+
 ## Security Model
 
 - Azure AI Language is the PII detection and redaction service. This solution does not send document content to a generative model.
@@ -23,12 +38,17 @@ Native document redaction uploads each PDF, DOCX, or TXT file to private tempora
 - The deployed Document Redaction Agent returns native document bytes as base64 over the Invocations protocol. The executor decodes them and writes the result to disk.
 - Privacy-safe application logs must not contain original or redacted document content.
 
-## Prerequisites
+## Choose A Workflow
 
-- Python 3.11 or newer. The hosted-agent configuration uses Python 3.13.
-- Azure CLI authenticated as an identity allowed to invoke the deployed Foundry agent.
-- Azure Developer CLI (`azd`) with the `responsibleai` environment already provisioned and deployed.
-- Network access to the deployed agent and any private endpoints required by your environment.
+| Goal | Start here |
+| --- | --- |
+| Develop or test text redaction locally | [Local Development](#local-development) |
+| Redact documents with an existing deployment | [Use The Deployed Document Agent](#use-the-deployed-document-agent) |
+| Provision a new public deployment | [Deploy Without A VNet](#deploy-without-a-vnet) |
+
+## Local Development
+
+Python 3.11 or newer is required. The hosted-agent configuration uses Python 3.13.
 
 Set up the local environment from the repository root:
 
@@ -44,7 +64,28 @@ Run offline tests before changing redaction behavior:
 .\.venv\Scripts\python.exe -m pytest --no-cov -q
 ```
 
-## Redact Documents With The Deployed Agent
+### Local Text API
+
+Run the PII Redaction Agent locally for text requests:
+
+```powershell
+.\.venv\Scripts\python.exe -m agents.pii_redaction.run_api
+```
+
+```powershell
+$body = @{ input = 'Contact synthetic.user@example.test'; language = 'en' } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/redact/text -ContentType application/json -Body $body
+```
+
+For local hosted-agent inspection, press **F5** in VS Code to start the Invocations host and open the Foundry Toolkit Agent Inspector.
+
+## Use The Deployed Document Agent
+
+This workflow requires:
+
+- Azure CLI authenticated as an identity allowed to invoke the deployed Foundry agent.
+- Azure Developer CLI (`azd`) with the deployed environment selected, unless you provide the endpoint explicitly.
+- Network access to the deployed agent and any private endpoints required by your environment.
 
 Place authorized files directly in [samples/input](samples/input). Do not place nested directories there. The standard executor processes one file at a time and writes the response to [samples/output](samples/output) using the same filename.
 
@@ -89,20 +130,11 @@ az role assignment create `
 
 Role assignments can take several minutes to propagate. The developer must run `az login` as the same identity before invoking an agent through the scripts in this repository. Do not grant **Owner** or **Contributor** merely to invoke an agent.
 
-### Agent Runtime RBAC
-
-The Document Redaction Agent's hosted runtime identity requires these resource-scoped assignments after `azd deploy`:
-
-| Resource | Built-in role | Purpose |
-| --- | --- | --- |
-| Azure AI Language | Cognitive Services User | Submit and poll native document PII jobs |
-| Temporary document Storage account | Storage Blob Data Contributor | Upload source files and download/delete redacted artifacts |
-
-`Cognitive Services Language Reader` is not sufficient because it does not authorize the native `/language/analyze-documents/jobs` operation. See [infra/README.md](infra/README.md#post-deployment-agent-identity-rbac) for the assignment commands and the complete specialist-agent RBAC matrix.
-
 ### PowerShell
 
-Load the active `responsibleai` environment into the current terminal without printing endpoint values:
+The executor resolves the deployed endpoint from `--endpoint`, then from `AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT`, and finally from the currently selected `azd` environment. After `azd up`, no manual endpoint export is required as long as that environment remains selected.
+
+If you need the complete active `responsibleai` environment in the current terminal, load it without printing endpoint values:
 
 ```powershell
 $values = azd env get-values --environment responsibleai --output json |
@@ -119,10 +151,8 @@ foreach ($item in $values.GetEnumerator()) {
 
 Redact one PDF and replace an existing output with the same name:
 
-The executor resolves the deployed endpoint from `--endpoint`, then from `AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT`, and finally from the currently selected azd environment. After `azd up`, no manual endpoint export is required as long as the deployed environment remains selected.
-
 ```powershell
-.\.venv\Scripts\python.exe scripts\live_document_executor.py `
+.\.venv\Scripts\python.exe -m scripts.live_document_executor `
   --input-dir samples\input `
   --output-dir samples\output `
   --file synthetic-scanned-pii.pdf `
@@ -133,7 +163,7 @@ The executor resolves the deployed endpoint from `--endpoint`, then from `AGENT_
 Redact one Word document:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\live_document_executor.py `
+.\.venv\Scripts\python.exe -m scripts.live_document_executor `
   --input-dir samples\input `
   --output-dir samples\output `
   --file synthetic-pii-record.docx `
@@ -144,7 +174,7 @@ Redact one Word document:
 Redact every supported file in the input folder sequentially:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\live_document_executor.py `
+.\.venv\Scripts\python.exe -m scripts.live_document_executor `
   --input-dir samples\input `
   --output-dir samples\output `
   --overwrite `
@@ -153,17 +183,16 @@ Redact every supported file in the input folder sequentially:
 
 ### Command Prompt
 
-Authenticate, then set the full deployed Invocations endpoint in the current `cmd.exe` window:
+Authenticate with Azure CLI:
 
 ```cmd
 az login
-set AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT=<deployed-invocations-endpoint>
 ```
 
 Run one file:
 
 ```cmd
-.\.venv\Scripts\python.exe scripts\live_document_executor.py --input-dir samples\input --output-dir samples\output --file synthetic-scanned-pii.pdf --overwrite --timeout-seconds 240
+.\.venv\Scripts\python.exe -m scripts.live_document_executor --input-dir samples\input --output-dir samples\output --file synthetic-scanned-pii.pdf --overwrite --timeout-seconds 240
 ```
 
 Do not paste the endpoint into source files, scripts, issue comments, or logs.
@@ -177,44 +206,18 @@ Do not paste the endpoint into source files, scripts, issue comments, or logs.
 - The executor validates returned native PDF, DOCX, and TXT artifacts before replacing an output. A failed call or invalid native artifact leaves any existing output unchanged.
 - Native source and output formats are preserved for `.txt`, `.pdf`, and `.docx`. Structured files are saved as redacted UTF-8 text.
 
-## Direct HTTP Debug Runner
+### Direct HTTP Debug Runner
 
-[scripts/debug_live_document_redactor.py](scripts/debug_live_document_redactor.py) is for a narrow live-agent diagnostic. It invokes exactly one `.pdf`, `.docx`, or `.txt` file and writes returned bytes without parsing the document. Use the standard executor for normal processing.
+[scripts/debug_live_document_redactor.py](scripts/debug_live_document_redactor.py) is for a narrow live-agent diagnostic. It invokes exactly one `.pdf`, `.docx`, or `.txt` file and writes returned bytes without parsing the document. It resolves the endpoint from `--endpoint`, the process environment, or the selected `azd` environment, in that order. Use the standard executor for normal processing.
 
-After loading the environment in PowerShell, run:
+With the deployed `azd` environment selected, run:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\debug_live_document_redactor.py `
+.\.venv\Scripts\python.exe -m scripts.debug_live_document_redactor `
   --input samples\input\synthetic-scanned-pii.pdf `
   --output samples\output\synthetic-scanned-pii.response.pdf `
   --timeout-seconds 240
 ```
-
-## Troubleshooting
-
-| Symptom | Check |
-| --- | --- |
-| `Set AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT` | Load the `responsibleai` azd environment or provide `--endpoint`. |
-| `HTTP 401` or `HTTP 403` | Run `az login` with an identity authorized to invoke the hosted agent. |
-| `HTTP 422` with `HTTP 401 (PermissionDenied)` | Rerun `azd up`, or load `azd env get-values` into the process and run `scripts/configure_agent_rbac.py`; then allow time for RBAC propagation. |
-| `FileExistsError` | Use `--overwrite` or select a new output folder. |
-| Invalid native document response | Preserve the prior output, inspect the hosted-agent trace, and do not rename text or JSON output as PDF/DOCX. |
-| Cannot query traces | Verify Azure RBAC for telemetry query access and the configured Azure Monitor network path. |
-
-## Local Text API
-
-The PII Redaction Agent can run locally for text requests:
-
-```powershell
-.\.venv\Scripts\python.exe -m agents.pii_redaction.run_api
-```
-
-```powershell
-$body = @{ input = 'Contact synthetic.user@example.test'; language = 'en' } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/redact/text -ContentType application/json -Body $body
-```
-
-For local hosted-agent inspection, press **F5** in VS Code to start the Invocations host and open the Foundry Toolkit Agent Inspector.
 
 ## Deploy Without a VNet
 
@@ -239,26 +242,40 @@ azd env set PII_DEFAULT_LANGUAGE "en"
 
 azd provision --preview
 azd up --no-prompt
+
+if ($LASTEXITCODE -eq 0) {
+  $env:AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT = `
+    azd env get-value AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT
+}
 ```
 
-After `azd up`, Bicep outputs and Foundry deployment outputs are persisted in the selected azd environment. The `postup` hooks configure hosted-agent RBAC and verify all required variable names without displaying their values; use `azd env get-values` to inspect them locally.
+After `azd up`, Bicep outputs and Foundry deployment outputs are persisted in the selected `azd` environment. The conditional block also loads the Document Redaction Agent endpoint into the current PowerShell process; child processes started from that terminal inherit it. The `postup` hooks configure hosted-agent RBAC and verify all required variable names without displaying their values; use `azd env get-values` to inspect them locally.
 
 Use a fresh environment because Foundry network injection cannot be changed after account creation. The `S` and `S0` tiers incur usage charges. See [infra/README.md](infra/README.md#provision-without-a-vnet) for infrastructure-only deployment, retry steps, and enterprise Storage policy considerations.
 
-## Architecture And Deployment
+### Agent Runtime RBAC
 
-```text
-agents/                         Hosted agent adapters
-  pii_redaction/                Text PII Redaction Agent
-  document_redaction/           Native and structured document redaction
-  image_redaction/              Image PII redaction
-shared/guardrails/              Detection, policies, document services, and native PII adapter
-scripts/                        Live invocation, executor, and synthetic-fixture utilities
-samples/                        Synthetic inputs and ignored local outputs
-tests/                          Offline and opt-in live tests
-infra/                          Bicep infrastructure templates
-docs/                           Architecture, security, evaluation, and deployment guidance
-```
+The Document Redaction Agent's hosted runtime identity requires these resource-scoped assignments after `azd deploy`:
+
+| Resource | Built-in role | Purpose |
+| --- | --- | --- |
+| Azure AI Language | Cognitive Services User | Submit and poll native document PII jobs |
+| Temporary document Storage account | Storage Blob Data Contributor | Upload source files and download/delete redacted artifacts |
+
+The `postup` hooks configure these assignments. `Cognitive Services Language Reader` is not sufficient because it does not authorize the native `/language/analyze-documents/jobs` operation. See [infra/README.md](infra/README.md#post-deployment-agent-identity-rbac) for manual recovery commands and the complete specialist-agent RBAC matrix.
+
+## Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| `Set AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT` | Update the local checkout, select the deployed `azd` environment, or provide `--endpoint`. |
+| `HTTP 401` or `HTTP 403` | Run `az login` with an identity authorized to invoke the hosted agent. |
+| `HTTP 422` with `HTTP 401 (PermissionDenied)` | Rerun `azd up`, or load `azd env get-values` into the process and run `scripts/configure_agent_rbac.py`; then allow time for RBAC propagation. |
+| `FileExistsError` | Use `--overwrite` or select a new output folder. |
+| Invalid native document response | Preserve the prior output, inspect the hosted-agent trace, and do not rename text or JSON output as PDF/DOCX. |
+| Cannot query traces | Verify Azure RBAC for telemetry query access and the configured Azure Monitor network path. |
+
+## Further Documentation
 
 For infrastructure operations, see [infra/README.md](infra/README.md) and [docs/deployment.md](docs/deployment.md). For the native document workflow, see [agents/document_redaction/README.md](agents/document_redaction/README.md) and [samples/README.md](samples/README.md).
 

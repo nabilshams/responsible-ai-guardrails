@@ -5,8 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import base64
-import os
-import subprocess
+import sys
 import tempfile
 from collections.abc import Sequence
 from pathlib import Path
@@ -14,7 +13,11 @@ from typing import Any, Protocol
 
 from azure.identity import DefaultAzureCredential
 
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from scripts.live_agent_client import LiveAgentClient
+from scripts.live_agent_client import resolve_endpoint as resolve_agent_endpoint
 from shared.guardrails.native_document_pii import validate_native_document
 
 _SUPPORTED_TYPES = {
@@ -39,33 +42,7 @@ class DocumentAgentClient(Protocol):
 
 def resolve_endpoint(explicit_endpoint: str | None = None) -> str:
     """Resolve the endpoint from an argument, process environment, or selected azd environment."""
-    endpoint = (explicit_endpoint or os.getenv(_ENDPOINT_VARIABLE, "")).strip()
-    if endpoint:
-        return endpoint
-
-    azd_environment = os.environ.copy()
-    azd_environment["AZURE_DEV_USER_AGENT"] = "microsoft_foundry_skill"
-    try:
-        result = subprocess.run(
-            ["azd", "env", "get-value", _ENDPOINT_VARIABLE, "--no-prompt"],
-            capture_output=True,
-            check=False,
-            env=azd_environment,
-            text=True,
-            timeout=30,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        result = None
-
-    if result is not None and result.returncode == 0:
-        endpoint = result.stdout.strip()
-        if endpoint:
-            return endpoint
-
-    raise ValueError(
-        f"Set {_ENDPOINT_VARIABLE}, pass --endpoint, or select an azd environment "
-        "where the Document Redaction Agent has been deployed"
-    )
+    return resolve_agent_endpoint(_ENDPOINT_VARIABLE, explicit_endpoint)
 
 
 def discover_input_files(input_dir: Path, selected_file: Path | None = None) -> list[Path]:

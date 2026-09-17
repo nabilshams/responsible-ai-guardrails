@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import subprocess
 from typing import Any
 
 import httpx
@@ -11,6 +14,45 @@ from azure.core.credentials import TokenCredential
 
 class LiveAgentInvocationError(RuntimeError):
     """Raised when a live hosted-agent invocation fails safely."""
+
+
+def resolve_endpoint(
+    variable_name: str,
+    explicit_endpoint: str | None = None,
+) -> str:
+    """Resolve an endpoint without displaying its value."""
+    endpoint = (explicit_endpoint or os.getenv(variable_name, "")).strip()
+    if endpoint:
+        return endpoint
+
+    azd_environment = os.environ.copy()
+    azd_environment["AZURE_DEV_USER_AGENT"] = "microsoft_foundry_skill"
+    azd_executable = shutil.which("azd")
+    try:
+        result = (
+            subprocess.run(  # noqa: S603 - executable is resolved; no shell.
+                [azd_executable, "env", "get-value", variable_name, "--no-prompt"],
+                capture_output=True,
+                check=False,
+                env=azd_environment,
+                text=True,
+                timeout=30,
+            )
+            if azd_executable is not None
+            else None
+        )
+    except subprocess.TimeoutExpired:
+        result = None
+
+    if result is not None and result.returncode == 0:
+        endpoint = result.stdout.strip()
+        if endpoint:
+            return endpoint
+
+    raise ValueError(
+        f"Set {variable_name}, pass --endpoint, or select an azd environment "
+        "where the agent has been deployed"
+    )
 
 
 def _safe_agent_error(response: httpx.Response) -> str:

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import base64
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +20,26 @@ class StubClient:
     async def invoke(self, payload: dict[str, Any]) -> dict[str, Any]:
         self.payload = payload
         return self.result
+
+
+def test_direct_script_loads_workspace_modules() -> None:
+    repository_root = Path(__file__).resolve().parents[1]
+
+    result = subprocess.run(  # noqa: S603 - trusted interpreter and script path.
+        [
+            sys.executable,
+            str(repository_root / "scripts" / "debug_live_document_redactor.py"),
+            "--help",
+        ],
+        cwd=repository_root,
+        capture_output=True,
+        check=False,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "--endpoint" in result.stdout
 
 
 @pytest.mark.asyncio
@@ -72,3 +94,78 @@ def test_main_reports_sanitized_live_invocation_error(
     assert "HTTP 422" in output
     assert "processing_failed" in output
     assert "https://" not in output
+
+
+def test_main_uses_endpoint_from_selected_azd_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "synthetic.pdf"
+    destination = tmp_path / "redacted.pdf"
+    source.write_bytes(b"synthetic-pdf-input")
+    endpoints: list[str] = []
+
+    class StubCredential:
+        def close(self) -> None:
+            pass
+
+    class StubLiveAgentClient(StubClient):
+        def __init__(
+            self,
+            endpoint: str,
+            _credential: StubCredential,
+            *,
+            timeout_seconds: float,
+        ) -> None:
+            endpoints.append(endpoint)
+            assert timeout_seconds == 240.0
+            super().__init__(
+                {
+                    "redacted_document_base64": base64.b64encode(
+                        b"synthetic-redacted-response"
+                    ).decode("ascii")
+                }
+            )
+
+    def run_azd(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        assert Path(command[0]).stem.casefold() == "azd"
+        assert command[1:] == [
+            "env",
+            "get-value",
+            "AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT",
+            "--no-prompt",
+        ]
+        assert kwargs["env"]["AZURE_DEV_USER_AGENT"] == "microsoft_foundry_skill"
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="https://synthetic.example.test/invocations\n",
+            stderr="",
+        )
+
+    monkeypatch.delenv(
+        "AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT",
+        raising=False,
+    )
+    monkeypatch.setattr(subprocess, "run", run_azd)
+    monkeypatch.setattr(
+        "scripts.debug_live_document_redactor.DefaultAzureCredential",
+        lambda **_kwargs: StubCredential(),
+    )
+    monkeypatch.setattr(
+        "scripts.debug_live_document_redactor.LiveAgentClient",
+        StubLiveAgentClient,
+    )
+
+    assert main(
+        [
+            "--input",
+            str(source),
+            "--output",
+            str(destination),
+            "--timeout-seconds",
+            "240",
+        ]
+    ) == 0
+    assert endpoints == ["https://synthetic.example.test/invocations"]
+    assert destination.read_bytes() == b"synthetic-redacted-response"

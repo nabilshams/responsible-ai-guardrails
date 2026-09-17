@@ -29,15 +29,15 @@ param privateEndpointSubnetPrefix string = '10.40.1.0/24'
   'F0'
   'S'
 ])
-@description('Azure AI Language SKU. F0 is the lowest tier; use S when free-tier limits are unsuitable or F0 is unavailable in the subscription/region.')
-param aiLanguageSku string = 'F0'
+@description('Azure AI Language SKU. Defaults to S because Azure permits only one F0 Text Analytics account per subscription.')
+param aiLanguageSku string = 'S'
 
 @allowed([
   'F0'
   'S0'
 ])
-@description('Azure Document Intelligence SKU. F0 is for development; use S0 for production documents.')
-param docIntelligenceSku string = 'F0'
+@description('Azure Document Intelligence SKU. Defaults to S0 to avoid the subscription-level F0 account limit.')
+param docIntelligenceSku string = 'S0'
 
 @description('Minimum confidence required to redact a detected PII entity.')
 param piiConfidenceThreshold string = '0.7'

@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import base64
-import os
+import sys
 import tempfile
 from collections.abc import Sequence
 from pathlib import Path
@@ -13,7 +13,14 @@ from typing import Any, Protocol
 
 from azure.identity import DefaultAzureCredential
 
-from scripts.live_agent_client import LiveAgentClient, LiveAgentInvocationError
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from scripts.live_agent_client import (
+    LiveAgentClient,
+    LiveAgentInvocationError,
+    resolve_endpoint,
+)
 
 _ENDPOINT_VARIABLE = "AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT"
 _DEFAULT_INPUT = Path("samples/input/synthetic-pii-form.pdf")
@@ -93,19 +100,18 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--input", type=Path, default=_DEFAULT_INPUT)
     parser.add_argument("--output", type=Path, default=_DEFAULT_OUTPUT)
-    parser.add_argument("--endpoint", default=os.getenv(_ENDPOINT_VARIABLE, ""))
+    parser.add_argument("--endpoint")
     parser.add_argument("--language", default="en")
     parser.add_argument("--timeout-seconds", type=float, default=240.0)
     return parser
 
 
 async def _run(arguments: argparse.Namespace) -> int:
-    if not arguments.endpoint:
-        raise ValueError(f"Set {_ENDPOINT_VARIABLE} or pass --endpoint")
+    endpoint = resolve_endpoint(_ENDPOINT_VARIABLE, arguments.endpoint)
     credential = DefaultAzureCredential(exclude_interactive_browser_credential=True)
     try:
         client = LiveAgentClient(
-            arguments.endpoint,
+            endpoint,
             credential,
             timeout_seconds=arguments.timeout_seconds,
         )

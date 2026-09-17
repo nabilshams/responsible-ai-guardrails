@@ -87,8 +87,8 @@ def test_resolve_endpoint_uses_selected_azd_environment(
     )
 
     def run_azd(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        assert command == [
-            "azd",
+        assert Path(command[0]).stem.casefold() == "azd"
+        assert command[1:] == [
             "env",
             "get-value",
             "AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT",
