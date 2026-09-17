@@ -1,12 +1,12 @@
 # Infrastructure Overview
 
-This directory contains modular Bicep templates for provisioning the Responsible AI Guardrails Microsoft Foundry hosted-agent solution with private network infrastructure.
+This directory contains modular Bicep templates for provisioning the Responsible AI Guardrails Microsoft Foundry hosted-agent solution with either public networking or private VNet isolation.
 
 ## Architecture
 
 The infrastructure provisions:
 
-- **Network**: VNet (10.40.0.0/16) with dedicated subnets:
+- **Network when `USE_VNET=true`**: VNet (10.40.0.0/16) with dedicated subnets:
   - Agent subnet (10.40.0.0/24) delegated to `Microsoft.App/environments`
   - Private endpoint subnet (10.40.1.0/24)
   - Network Security Groups with minimal safe rules
@@ -14,18 +14,17 @@ The infrastructure provisions:
 - **AI Services**:
   - Microsoft Foundry AIServices account S0 (lowest supported Foundry tier, with system identity)
   - Azure AI Language F0 by default (PII detection, managed identity only)
-  - Foundry public access is configurable and enabled by the azd parameter binding; Azure AI Language remains private-only
+  - Public endpoints in public mode; private endpoints and deny-by-default access in VNet mode
 
 - **Container Infrastructure**:
   - Azure Container Registry Basic with public network access, Microsoft Entra RBAC, and no admin/anonymous access
   - ACR pull access granted to the Foundry project identity
 
 - **Monitoring**:
-  - Log Analytics workspace (private ingestion/query)
-  - Application Insights (private ingestion/query)
-  - Azure Monitor Private Link Scope with all required DNS zones
+  - Log Analytics workspace and Application Insights in both modes
+  - Azure Monitor Private Link Scope and private ingestion only in VNet mode
 
-- **Private DNS Zones**:
+- **Private DNS Zones when `USE_VNET=true`**:
   - `privatelink.cognitiveservices.azure.com` (Azure AI Language)
   - `privatelink.openai.azure.com` (Foundry compatibility)
   - `privatelink.services.ai.azure.com` (Foundry AIServices)
@@ -35,7 +34,7 @@ The infrastructure provisions:
 
 ### Prerequisites
 
-1. **VNet-connected execution environment**: Provision from a VM, Azure DevOps agent, or GitHub self-hosted runner with access to the VNet
+1. **Execution environment**: VNet mode must be provisioned from a VM, Azure DevOps agent, or GitHub self-hosted runner with VNet access; public mode can be provisioned from a normal authenticated workstation
 2. **Azure CLI and azd**: Latest versions installed
 3. **Permissions**: Contributor access to target subscription/resource group
 
@@ -45,7 +44,7 @@ The `main.parameters.json` file defines azd environment variable bindings:
 
 - `AZURE_ENV_NAME`: Unique environment identifier (used as resource name prefix)
 - `AZURE_LOCATION`: Azure region (default: `eastus2`)
-- `FOUNDRY_PUBLIC_NETWORK_ACCESS`: Foundry public endpoint state (default: `Enabled`; set to `Disabled` for VNet-only deployment)
+- `USE_VNET`: Enables VNet injection, private endpoints, private DNS, and private service access (default: `true`)
 - `VNET_ADDRESS_PREFIX`: VNet CIDR (default: `10.40.0.0/16`)
 - `AGENT_SUBNET_PREFIX`: Agent subnet CIDR (default: `10.40.0.0/24`)
 - `PE_SUBNET_PREFIX`: Private endpoint subnet CIDR (default: `10.40.1.0/24`)
@@ -72,7 +71,7 @@ azd init
 # Set core parameters
 azd env set AZURE_ENV_NAME "rai-dev"
 azd env set AZURE_LOCATION "eastus2"
-azd env set FOUNDRY_PUBLIC_NETWORK_ACCESS "Enabled"
+azd env set USE_VNET "true"
 
 # Optional: override network defaults
 azd env set VNET_ADDRESS_PREFIX "10.50.0.0/16"
@@ -97,6 +96,64 @@ Or provision and deploy in one command:
 ```powershell
 azd up --no-prompt
 ```
+
+### Provision Without a VNet
+
+Public mode skips the VNet, delegated subnet, private endpoint subnet, private endpoints, private DNS zones, and Azure Monitor Private Link Scope. It enables authenticated public endpoints for Foundry and the supporting data-plane services. The template also creates the account-level and project-level capability hosts required by hosted agents.
+
+Use a new azd environment and Foundry account. Hosted Agent network injection is fixed when the Foundry account is created, so do not toggle `USE_VNET` on an existing environment.
+
+Run the following commands from the repository root. Replace the example environment name, tenant ID, and subscription ID with your values:
+
+```powershell
+# Keep Foundry attribution scoped to this terminal session.
+$env:AZURE_DEV_USER_AGENT = "microsoft_foundry_skill"
+
+# Authenticate azd directly to the tenant that owns the target subscription.
+azd auth logout
+azd auth login --tenant-id "<tenant-id>" --use-device-code
+azd auth login --check-status
+
+# Create and select a fresh environment.
+azd env new "rai-public" `
+  --location "eastus2" `
+  --subscription "<subscription-id>" `
+  --no-prompt
+
+# Select public networking.
+azd env set USE_VNET "false"
+
+# Use paid tiers when the subscription already contains its allowed free-tier resources.
+azd env set AI_LANGUAGE_SKU "S"
+azd env set DOCUMENT_INTELLIGENCE_SKU "S0"
+
+# Agent defaults.
+azd env set PII_CONFIDENCE_THRESHOLD "0.7"
+azd env set PII_DEFAULT_LANGUAGE "en"
+
+# Review the selected environment and validate the Azure deployment.
+azd env get-values
+azd provision --preview
+
+# Provision infrastructure and deploy all hosted agents.
+azd up --no-prompt
+```
+
+To provision infrastructure without deploying the agents, replace the final command with:
+
+```powershell
+azd provision --no-prompt
+```
+
+If infrastructure succeeds but an agent deployment fails, retry only the deployment:
+
+```powershell
+azd deploy --no-prompt
+```
+
+The `S` and `S0` Cognitive Services tiers incur usage charges. You can try `F0` only when the subscription has free-tier capacity available.
+
+Some enterprise Azure Policies force Storage public network access to `Disabled`. In that case, text and image agents can use public mode, but native PDF, DOCX, and TXT document redaction cannot reach its temporary Blob Storage without an approved network path or policy exception.
 
 ## Post-Deployment: Agent Identity RBAC
 
@@ -128,12 +185,16 @@ az role assignment create `
 
 ### Check Private Endpoints
 
+For VNet mode:
+
 ```powershell
 # List private endpoints and their connection states
 az network private-endpoint list --resource-group rg-rai-dev --output table
 ```
 
 All endpoints should show `Approved` connection state.
+
+For public mode, the same command should return no private endpoints.
 
 ### Verify DNS Resolution
 
@@ -166,7 +227,7 @@ Invoke-RestMethod -Method Post -Uri "https://your-agent-endpoint/invoke" `
 | `modules/monitoring.bicep` | Observability | Log Analytics, App Insights, AMPLS |
 | `modules/acr.bicep` | Container registry | Basic public ACR with diagnostics and RBAC-only access |
 | `modules/ai.bicep` | AI services | AIServices and Azure AI Language |
-| `modules/foundryProject.bicep` | Foundry workspace | Project and Basic capability host |
+| `modules/foundryProject.bicep` | Foundry workspace | Project capability host and public-mode account capability host |
 | `modules/foundryMonitoringConnection.bicep` | Foundry observability | Shared Application Insights connection |
 | `modules/privateEndpoints.bicep` | Private connectivity | 3 private endpoints with DNS groups |
 | `modules/rbac.bicep` | Access control | ACR pull role for AI Services |
@@ -174,14 +235,15 @@ Invoke-RestMethod -Method Post -Uri "https://your-agent-endpoint/invoke" `
 ## Security Notes
 
 - **No secrets in source control**: All authentication uses managed identities or DefaultAzureCredential
-- **Scoped public access**: Foundry public access is configurable to support workstation deployment; Azure AI Language and monitoring remain private-only. ACR intentionally uses a public endpoint with Microsoft Entra RBAC and its admin account disabled
+- **Explicit network posture**: `USE_VNET=true` makes Foundry and supporting data-plane services private; `USE_VNET=false` enables their public endpoints while retaining Microsoft Entra authentication and disabled shared-key access where supported
 - **Least privilege**: AI Services has only ACR pull; agent identity requires explicit Cognitive Services User assignment
 - **Audit logs**: All resources send diagnostics to Log Analytics
 - **Network isolation**: NSGs enforce minimal safe rules; egress to Azure services via service tags
 
 ## Limitations
 
-- **Deployment network access**: Workstation deployment requires Foundry public access; private-only deployments must run from a VNet-connected environment
+- **Deployment network access**: VNet deployments must run from a VNet-connected environment; public deployments can run from a normal workstation
+- **Immutable Foundry injection**: Switching between public and VNet modes requires a new Foundry account
 - **No generative model**: This template provisions deterministic PII detection only; add model deployments separately if needed
 - **Agent identity RBAC timing**: Agent runtime identity doesn't exist until first deploy; manual role assignment may be required
 - **Azure Firewall not included**: Egress uses service tags; add Azure Firewall for FQDN-level control if required

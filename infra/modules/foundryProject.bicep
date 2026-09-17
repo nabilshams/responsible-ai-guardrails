@@ -1,10 +1,11 @@
-// Foundry project and Basic Agent capability host. The parent account's
-// network injection creates the account-level host; no BYO data stores exist.
+// Foundry project and Basic Agent capability hosts. VNet injection creates the
+// account-level host automatically; public deployments create it explicitly.
 targetScope = 'resourceGroup'
 
 param location string
 param aiServicesName string
 param aiProjectName string
+param useVnet bool
 
 resource aiServices 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' existing = {
   name: aiServicesName
@@ -25,6 +26,16 @@ resource aiProject 'Microsoft.CognitiveServices/accounts/projects@2025-04-01-pre
 }
 
 #disable-next-line BCP081
+resource accountCapabilityHost 'Microsoft.CognitiveServices/accounts/capabilityHosts@2025-04-01-preview' = if (!useVnet) {
+  parent: aiServices
+  name: '${aiServices.name}-capHost'
+  properties: {
+    #disable-next-line BCP037
+    capabilityHostKind: 'Agents'
+  }
+}
+
+#disable-next-line BCP081
 resource projectCapabilityHost 'Microsoft.CognitiveServices/accounts/projects/capabilityHosts@2025-04-01-preview' = {
   parent: aiProject
   name: 'caphostproj'
@@ -32,6 +43,9 @@ resource projectCapabilityHost 'Microsoft.CognitiveServices/accounts/projects/ca
     #disable-next-line BCP037
     capabilityHostKind: 'Agents'
   }
+  dependsOn: [
+    accountCapabilityHost
+  ]
 }
 
 output aiProjectName string = aiProject.name

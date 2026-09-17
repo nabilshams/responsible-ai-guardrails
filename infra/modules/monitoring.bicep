@@ -8,6 +8,7 @@ param tags object
 param logAnalyticsName string
 param appInsightsName string
 param amplsName string
+param useVnet bool
 
 // Log Analytics workspace
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
@@ -19,7 +20,7 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
       name: 'PerGB2018'
     }
     retentionInDays: 30
-    publicNetworkAccessForIngestion: 'Disabled'
+    publicNetworkAccessForIngestion: useVnet ? 'Disabled' : 'Enabled'
     publicNetworkAccessForQuery: 'Enabled'
   }
 }
@@ -33,13 +34,13 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
   properties: {
     Application_Type: 'web'
     WorkspaceResourceId: logAnalytics.id
-    publicNetworkAccessForIngestion: 'Disabled'
+    publicNetworkAccessForIngestion: useVnet ? 'Disabled' : 'Enabled'
     publicNetworkAccessForQuery: 'Enabled'
   }
 }
 
 // Azure Monitor Private Link Scope
-resource ampls 'Microsoft.Insights/privateLinkScopes@2021-07-01-preview' = {
+resource ampls 'Microsoft.Insights/privateLinkScopes@2021-07-01-preview' = if (useVnet) {
   name: amplsName
   location: 'global'
   tags: tags
@@ -52,7 +53,7 @@ resource ampls 'Microsoft.Insights/privateLinkScopes@2021-07-01-preview' = {
 }
 
 // Link Log Analytics to AMPLS
-resource amplsLogAnalyticsLink 'Microsoft.Insights/privateLinkScopes/scopedResources@2021-07-01-preview' = {
+resource amplsLogAnalyticsLink 'Microsoft.Insights/privateLinkScopes/scopedResources@2021-07-01-preview' = if (useVnet) {
   parent: ampls
   name: 'log-analytics-scoped-resource'
   properties: {
@@ -61,7 +62,7 @@ resource amplsLogAnalyticsLink 'Microsoft.Insights/privateLinkScopes/scopedResou
 }
 
 // Link Application Insights to AMPLS
-resource amplsAppInsightsLink 'Microsoft.Insights/privateLinkScopes/scopedResources@2021-07-01-preview' = {
+resource amplsAppInsightsLink 'Microsoft.Insights/privateLinkScopes/scopedResources@2021-07-01-preview' = if (useVnet) {
   parent: ampls
   name: 'app-insights-scoped-resource'
   properties: {
@@ -74,4 +75,4 @@ output logAnalyticsName string = logAnalytics.name
 output appInsightsId string = appInsights.id
 output appInsightsName string = appInsights.name
 output appInsightsConnectionString string = appInsights.properties.ConnectionString
-output amplsId string = ampls.id
+output amplsId string = useVnet ? ampls!.id : ''

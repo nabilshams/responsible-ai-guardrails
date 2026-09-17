@@ -11,11 +11,11 @@
 
 ## Azure Infrastructure Provisioning
 
-This solution uses custom Bicep templates for full control over networking, private endpoints, and security configuration.
+This solution uses custom Bicep templates with a `USE_VNET` switch for either public networking or VNet isolation.
 
 ### Prerequisites
 
-- **VNet-connected execution environment**: Deploy from a VM, Azure Bastion, Azure DevOps agent, or GitHub self-hosted runner with connectivity to the target VNet
+- **Execution environment**: VNet mode requires a VM, Azure Bastion, Azure DevOps agent, or GitHub self-hosted runner with target VNet connectivity; public mode can deploy from a normal authenticated workstation
 - **Azure CLI**: Version 2.50.0 or newer
 - **Azure Developer CLI (azd)**: Version 1.27.1 or newer
 - **Permissions**: Contributor plus Role Based Access Administrator, or Owner, so the deployment can create scoped RBAC assignments
@@ -24,11 +24,11 @@ This solution uses custom Bicep templates for full control over networking, priv
 
 The Bicep templates provision:
 
-- **Private network**: VNet (default 10.40.0.0/16) with agent subnet (10.40.0.0/24, delegated to Microsoft.App/environments) and private endpoint subnet (10.40.1.0/24)
-- **AI Services**: Microsoft Foundry AIServices account with configurable public access plus private-only Azure AI Language and Document Intelligence; all use system-managed identity and retain private endpoints
+- **Private network in VNet mode**: VNet (default 10.40.0.0/16) with agent subnet (10.40.0.0/24, delegated to Microsoft.App/environments) and private endpoint subnet (10.40.1.0/24)
+- **AI Services**: Microsoft Foundry AIServices, Azure AI Language, and Document Intelligence use private endpoints in VNet mode and authenticated public endpoints in public mode
 - **Container Registry**: Basic Azure Container Registry with public network access, admin user disabled, and Microsoft Entra RBAC
-- **Monitoring**: Application Insights + Log Analytics + Azure Monitor Private Link Scope for private-only telemetry
-- **Private DNS**: 7 private DNS zones linked to the VNet for automatic private endpoint resolution
+- **Monitoring**: Application Insights and Log Analytics in both modes; Azure Monitor Private Link Scope in VNet mode
+- **Private DNS in VNet mode**: Private DNS zones linked to the VNet for automatic private endpoint resolution
 - **RBAC**: Foundry project identity receives ACR pull access; each agent runtime identity receives only its required Cognitive Services User assignments
 
 See [`infra/README.md`](../infra/README.md) for detailed architecture and module reference.
@@ -38,7 +38,7 @@ See [`infra/README.md`](../infra/README.md) for detailed architecture and module
 Default values (customizable via azd environment variables):
 
 - **Region**: East US 2
-- **Foundry public network access**: Enabled for deployment from the local workstation; set `FOUNDRY_PUBLIC_NETWORK_ACCESS=Disabled` for private-only deployments
+- **Network mode**: VNet isolation by default; set `USE_VNET=false` for public networking
 - **VNet CIDR**: 10.40.0.0/16
 - **Agent subnet**: 10.40.0.0/24
 - **Private endpoint subnet**: 10.40.1.0/24
@@ -57,7 +57,7 @@ azd init
 # 2. Configure environment
 azd env set AZURE_ENV_NAME "rai-prod"
 azd env set AZURE_LOCATION "eastus2"
-azd env set FOUNDRY_PUBLIC_NETWORK_ACCESS "Enabled"
+azd env set USE_VNET "true"
 
 # 3. Optional: override network defaults
 azd env set VNET_ADDRESS_PREFIX "10.50.0.0/16"
@@ -74,6 +74,17 @@ azd provision --preview
 # 5. Provision and deploy in one step
 azd up --no-prompt
 ```
+
+For public networking, create a separate environment and use:
+
+```powershell
+azd env new rai-public
+azd env set AZURE_LOCATION "eastus2"
+azd env set USE_VNET "false"
+azd up --no-prompt
+```
+
+Do not change `USE_VNET` for an existing Foundry account. Hosted Agent network injection cannot be added or changed after account creation; use a new azd environment when switching modes.
 
 ### Post-Deployment: Agent Identity RBAC
 
@@ -98,6 +109,8 @@ az role assignment create --assignee $agentPrincipalId --role $roleId --scope $l
 
 ### Validation
 
+For VNet mode:
+
 1. **Private endpoints**: Verify all endpoints show `Approved` state:
 
    ```powershell
@@ -112,11 +125,13 @@ az role assignment create --assignee $agentPrincipalId --role $roleId --scope $l
 
 3. **Agent functionality**: Test an invocation via Agent Inspector or direct API call
 
+For public mode, confirm the private endpoint list is empty and invoke the agent from an authenticated workstation.
+
 ## CI/CD
 
 ### GitHub Actions
 
-The deployment workflow uses OIDC authentication and requires a **self-hosted runner with VNet connectivity** to access private endpoints.
+The deployment workflow uses OIDC authentication. VNet mode requires a **self-hosted runner with VNet connectivity**; public mode can use a Microsoft-hosted runner.
 
 **Required GitHub environment variables**:
 
@@ -144,7 +159,7 @@ No secrets are stored in the repository; all authentication uses OIDC federation
 
 ### Azure DevOps
 
-For Azure DevOps pipelines:
+For Azure DevOps pipelines in VNet mode:
 
 1. Use a self-hosted agent in the VNet or with private endpoint access
 2. Configure a service connection with managed identity or federated credential

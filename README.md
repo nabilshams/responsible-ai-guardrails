@@ -162,6 +162,33 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/redact/text -Conten
 
 For local hosted-agent inspection, press **F5** in VS Code to start the Invocations host and open the Foundry Toolkit Agent Inspector.
 
+## Deploy Without a VNet
+
+Create a new environment for public networking. Replace the tenant and subscription placeholders, then run these commands from the repository root:
+
+```powershell
+$env:AZURE_DEV_USER_AGENT = "microsoft_foundry_skill"
+
+azd auth logout
+azd auth login --tenant-id "<tenant-id>" --use-device-code
+
+azd env new "rai-public" `
+  --location "eastus2" `
+  --subscription "<subscription-id>" `
+  --no-prompt
+
+azd env set USE_VNET "false"
+azd env set AI_LANGUAGE_SKU "S"
+azd env set DOCUMENT_INTELLIGENCE_SKU "S0"
+azd env set PII_CONFIDENCE_THRESHOLD "0.7"
+azd env set PII_DEFAULT_LANGUAGE "en"
+
+azd provision --preview
+azd up --no-prompt
+```
+
+Use a fresh environment because Foundry network injection cannot be changed after account creation. The `S` and `S0` tiers incur usage charges. See [infra/README.md](infra/README.md#provision-without-a-vnet) for infrastructure-only deployment, retry steps, and enterprise Storage policy considerations.
+
 ## Architecture And Deployment
 
 ```text

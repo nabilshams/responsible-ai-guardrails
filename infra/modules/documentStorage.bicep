@@ -3,6 +3,7 @@ targetScope = 'resourceGroup'
 param location string
 param tags object
 param storageAccountName string
+param useVnet bool
 
 resource storage 'Microsoft.Storage/storageAccounts@2025-06-01' = {
   name: storageAccountName
@@ -22,7 +23,7 @@ resource storage 'Microsoft.Storage/storageAccounts@2025-06-01' = {
     supportsHttpsTrafficOnly: true
     networkAcls: {
       bypass: 'AzureServices'
-      defaultAction: 'Deny'
+      defaultAction: useVnet ? 'Deny' : 'Allow'
       ipRules: []
       virtualNetworkRules: []
     }

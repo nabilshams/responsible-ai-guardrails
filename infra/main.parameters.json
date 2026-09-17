@@ -8,8 +8,8 @@
     "location": {
       "value": "${AZURE_LOCATION=eastus2}"
     },
-    "foundryPublicNetworkAccess": {
-      "value": "${FOUNDRY_PUBLIC_NETWORK_ACCESS=Enabled}"
+    "useVnet": {
+      "value": "${USE_VNET=true}"
     },
     "vnetAddressPrefix": {
       "value": "${VNET_ADDRESS_PREFIX=10.40.0.0/16}"

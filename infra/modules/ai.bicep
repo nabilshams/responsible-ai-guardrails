@@ -1,5 +1,5 @@
 // Microsoft Foundry AI Services and supporting Cognitive Services resources
-// All configured with system identity, private access only, no key-based auth where supported
+// All use system identity and derive their network access from the selected deployment mode.
 
 targetScope = 'resourceGroup'
 
@@ -10,13 +10,12 @@ param aiLanguageName string
 param docIntelligenceName string
 param aiLanguageSku string
 param docIntelligenceSku string
-@allowed([
-  'Enabled'
-  'Disabled'
-])
-param foundryPublicNetworkAccess string
+param useVnet bool
 param agentSubnetId string
 param logAnalyticsWorkspaceId string
+
+var publicNetworkAccess = useVnet ? 'Disabled' : 'Enabled'
+var networkDefaultAction = useVnet ? 'Deny' : 'Allow'
 
 // Microsoft Foundry AIServices account. Network injection must be configured
 // when this account is first created; it cannot be added later for hosted agents.
@@ -32,17 +31,18 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = 
   identity: {
     type: 'SystemAssigned'
   }
-  properties: {
+  properties: union({
     allowProjectManagement: true
     customSubDomainName: aiServicesName
-    publicNetworkAccess: foundryPublicNetworkAccess
+    publicNetworkAccess: publicNetworkAccess
     networkAcls: {
-      defaultAction: foundryPublicNetworkAccess == 'Enabled' ? 'Allow' : 'Deny'
+      defaultAction: networkDefaultAction
       bypass: 'AzureServices'
       ipRules: []
       virtualNetworkRules: []
     }
-    #disable-next-line BCP036
+    disableLocalAuth: false // Foundry may require key auth for initial setup
+  }, useVnet ? {
     networkInjections: [
       {
         scenario: 'agent'
@@ -50,8 +50,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = 
         useMicrosoftManagedNetwork: false
       }
     ]
-    disableLocalAuth: false // Foundry may require key auth for initial setup
-  }
+  } : {})
 }
 
 // Azure AI Language (PII detection and text analysis)
@@ -68,9 +67,9 @@ resource aiLanguage 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
   properties: {
     customSubDomainName: aiLanguageName
-    publicNetworkAccess: 'Disabled'
+    publicNetworkAccess: publicNetworkAccess
     networkAcls: {
-      defaultAction: 'Deny'
+      defaultAction: networkDefaultAction
       ipRules: []
       virtualNetworkRules: []
     }
@@ -92,9 +91,9 @@ resource docIntelligence 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
   properties: {
     customSubDomainName: docIntelligenceName
-    publicNetworkAccess: 'Disabled'
+    publicNetworkAccess: publicNetworkAccess
     networkAcls: {
-      defaultAction: 'Deny'
+      defaultAction: networkDefaultAction
       ipRules: []
       virtualNetworkRules: []
     }

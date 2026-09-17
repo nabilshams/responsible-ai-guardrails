@@ -1,5 +1,5 @@
 // Main Bicep template for Responsible AI Guardrails - Microsoft Foundry hosted agent solution
-// Provisions private network infrastructure with VNet injection and private endpoints
+// Supports public networking or private networking with VNet injection and private endpoints.
 
 targetScope = 'resourceGroup'
 
@@ -12,6 +12,9 @@ param environmentName string
 
 @description('Primary Azure region for resources')
 param location string = resourceGroup().location
+
+@description('Deploy with VNet injection, private endpoints, and private DNS. Set to false for public networking.')
+param useVnet bool = true
 
 @description('VNet address space (CIDR)')
 param vnetAddressPrefix string = '10.40.0.0/16'
@@ -35,13 +38,6 @@ param aiLanguageSku string = 'F0'
 ])
 @description('Azure Document Intelligence SKU. F0 is for development; use S0 for production documents.')
 param docIntelligenceSku string = 'F0'
-
-@allowed([
-  'Enabled'
-  'Disabled'
-])
-@description('Public network access for the Microsoft Foundry account. Specialist AI services remain private.')
-param foundryPublicNetworkAccess string = 'Disabled'
 
 // ========== VARIABLES ==========
 
@@ -75,7 +71,7 @@ var resourceNames = {
 // ========== MODULES ==========
 
 // Network infrastructure (VNet, subnets, NSGs)
-module network 'modules/network.bicep' = {
+module network 'modules/network.bicep' = if (useVnet) {
   name: 'network-deployment'
   params: {
     location: location
@@ -100,14 +96,15 @@ module monitoring 'modules/monitoring.bicep' = {
     logAnalyticsName: resourceNames.logAnalytics
     appInsightsName: resourceNames.appInsights
     amplsName: resourceNames.ampls
+    useVnet: useVnet
   }
 }
 
 // Private DNS zones for all private endpoint types
-module dns 'modules/dns.bicep' = {
+module dns 'modules/dns.bicep' = if (useVnet) {
   name: 'dns-deployment'
   params: {
-    vnetId: network.outputs.vnetId
+    vnetId: network!.outputs.vnetId
     tags: tags
   }
 }
@@ -130,6 +127,7 @@ module documentStorage 'modules/documentStorage.bicep' = {
     location: location
     tags: tags
     storageAccountName: resourceNames.documentStorage
+    useVnet: useVnet
   }
 }
 
@@ -144,8 +142,8 @@ module ai 'modules/ai.bicep' = {
     docIntelligenceName: resourceNames.docIntelligence
     aiLanguageSku: aiLanguageSku
     docIntelligenceSku: docIntelligenceSku
-    foundryPublicNetworkAccess: foundryPublicNetworkAccess
-    agentSubnetId: network.outputs.agentSubnetId
+    useVnet: useVnet
+    agentSubnetId: useVnet ? network!.outputs.agentSubnetId : ''
     logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsId
   }
 }
@@ -161,37 +159,37 @@ module foundryMonitoringConnection 'modules/foundryMonitoringConnection.bicep' =
 }
 
 // Private endpoints for AI services and Azure Monitor; ACR intentionally uses its public endpoint
-module privateEndpoints 'modules/privateEndpoints.bicep' = {
+module privateEndpoints 'modules/privateEndpoints.bicep' = if (useVnet) {
   name: 'private-endpoints-deployment'
   params: {
     location: location
     tags: tags
-    peSubnetId: network.outputs.peSubnetId
+    peSubnetId: network!.outputs.peSubnetId
     aiServicesId: ai.outputs.aiServicesId
     aiLanguageId: ai.outputs.aiLanguageId
     docIntelligenceId: ai.outputs.docIntelligenceId
     amplsId: monitoring.outputs.amplsId
     documentStorageId: documentStorage.outputs.storageAccountId
     // Private DNS zone IDs
-    cognitiveServicesDnsZoneId: dns.outputs.cognitiveServicesDnsZoneId
-    openaiDnsZoneId: dns.outputs.openaiDnsZoneId
-    aiServicesDnsZoneId: dns.outputs.aiServicesDnsZoneId
-    monitorDnsZoneId: dns.outputs.monitorDnsZoneId
-    omsDnsZoneId: dns.outputs.omsDnsZoneId
-    odsDnsZoneId: dns.outputs.odsDnsZoneId
-    agentSvcDnsZoneId: dns.outputs.agentSvcDnsZoneId
-    blobDnsZoneId: dns.outputs.blobDnsZoneId
+    cognitiveServicesDnsZoneId: dns!.outputs.cognitiveServicesDnsZoneId
+    openaiDnsZoneId: dns!.outputs.openaiDnsZoneId
+    aiServicesDnsZoneId: dns!.outputs.aiServicesDnsZoneId
+    monitorDnsZoneId: dns!.outputs.monitorDnsZoneId
+    omsDnsZoneId: dns!.outputs.omsDnsZoneId
+    odsDnsZoneId: dns!.outputs.odsDnsZoneId
+    agentSvcDnsZoneId: dns!.outputs.agentSvcDnsZoneId
+    blobDnsZoneId: dns!.outputs.blobDnsZoneId
   }
 }
 
-// Create the project and Basic capability host only after private connectivity
-// exists. This follows the supported network-secured Foundry deployment order.
+// In VNet mode, create the project only after private connectivity exists.
 module foundryProject 'modules/foundryProject.bicep' = {
   name: 'foundry-project-deployment'
   params: {
     location: location
     aiServicesName: ai.outputs.aiServicesName
     aiProjectName: resourceNames.aiProject
+    useVnet: useVnet
   }
   dependsOn: [
     privateEndpoints
@@ -238,11 +236,12 @@ output APPLICATIONINSIGHTS_CONNECTION_STRING string = monitoring.outputs.appInsi
 output AZURE_LOG_ANALYTICS_WORKSPACE_ID string = monitoring.outputs.logAnalyticsId
 
 // Network
-output VNET_ID string = network.outputs.vnetId
-output AGENT_SUBNET_ID string = network.outputs.agentSubnetId
-output PE_SUBNET_ID string = network.outputs.peSubnetId
+output VNET_ID string = useVnet ? network!.outputs.vnetId : ''
+output AGENT_SUBNET_ID string = useVnet ? network!.outputs.agentSubnetId : ''
+output PE_SUBNET_ID string = useVnet ? network!.outputs.peSubnetId : ''
 output AZURE_RESOURCE_GROUP string = resourceGroup().name
 
 // Environment config (agent configuration values)
+output ENABLE_CAPABILITY_HOST string = 'true'
 output PII_CONFIDENCE_THRESHOLD string = '0.7'
 output PII_DEFAULT_LANGUAGE string = 'en'
