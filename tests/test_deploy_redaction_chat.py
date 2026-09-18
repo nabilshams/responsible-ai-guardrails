@@ -105,7 +105,7 @@ def test_reports_missing_azure_cli(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_runs_azure_cli_with_utf8(monkeypatch: pytest.MonkeyPatch) -> None:
     observed_environment: dict[str, str] = {}
 
-    def run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+    def run(*_: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
         observed_environment.update(kwargs["env"])  # type: ignore[arg-type]
         return completed()
 
