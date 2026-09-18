@@ -44,6 +44,7 @@ docs/                           Architecture, security, evaluation, and deployme
 | --- | --- |
 | Develop or test text redaction locally | [Local Development](#local-development) |
 | Redact documents with an existing deployment | [Use The Deployed Document Agent](#use-the-deployed-document-agent) |
+| Deploy a private environment from a VNet-connected host | [Deploy With VNet Isolation](#deploy-with-vnet-isolation) |
 | Provision a new public deployment | [Deploy Without A VNet](#deploy-without-a-vnet) |
 
 ## Local Development
@@ -220,9 +221,21 @@ With the deployed `azd` environment selected, run:
   --timeout-seconds 240
 ```
 
+## Deploy With VNet Isolation
+
+VNet mode uses a hybrid Foundry network posture. Foundry and Azure Container Registry permit authenticated public access while Foundry retains its private endpoint and hosted-agent VNet injection. Azure AI Language, Document Intelligence, Storage, monitoring, and the redaction chat remain reachable only through the VNet-connected network path. Run deployment from a VM, self-hosted runner, VPN, or ExpressRoute connection that can resolve the linked private DNS zones required by those dependencies.
+
+```powershell
+$env:AZURE_DEV_USER_AGENT = "microsoft_foundry_skill"
+azd -C infra/private env new "rai-private" --location "eastus2"
+azd -C infra/private up --no-prompt
+```
+
+The [private deployment folder](infra/private) fixes this hybrid VNet posture at compile time and does not accept a network-mode override. Both profiles use Standard ACR with public network access for ordinary remote ACR builds. Registry admin access remains disabled, and Foundry and Container Apps pull images through scoped managed identities. Docker Desktop is not required. Foundry public access still requires Microsoft Entra authentication and project RBAC; local authentication remains disabled.
+
 ## Deploy Without a VNet
 
-Create a new environment for public networking. Replace the tenant and subscription placeholders, then run these commands from the repository root:
+The [public deployment folder](infra/public) omits the VNet, private endpoints, and private DNS. Replace the tenant and subscription placeholders, then run these commands from the repository root:
 
 ```powershell
 $env:AZURE_DEV_USER_AGENT = "microsoft_foundry_skill"
@@ -230,24 +243,23 @@ $env:AZURE_DEV_USER_AGENT = "microsoft_foundry_skill"
 azd auth logout
 azd auth login --tenant-id "<tenant-id>" --use-device-code
 
-azd env new "rai-public" `
+azd -C infra/public env new "rai-public" `
   --location "eastus2" `
   --subscription "<subscription-id>" `
   --no-prompt
 
-azd env set USE_VNET "false"
-azd env set AI_LANGUAGE_SKU "S"
-azd env set DOCUMENT_INTELLIGENCE_SKU "S0"
-azd env set PII_CONFIDENCE_THRESHOLD "0.7"
-azd env set PII_DEFAULT_LANGUAGE "en"
+azd -C infra/public env set AI_LANGUAGE_SKU "S"
+azd -C infra/public env set DOCUMENT_INTELLIGENCE_SKU "S0"
+azd -C infra/public env set PII_CONFIDENCE_THRESHOLD "0.7"
+azd -C infra/public env set PII_DEFAULT_LANGUAGE "en"
 
-azd provision --preview
-azd up --no-prompt
+azd -C infra/public provision --preview
+azd -C infra/public up --no-prompt
 ```
 
-After `azd up`, Bicep outputs and Foundry deployment outputs are persisted in the selected `azd` environment. The `postup` hooks configure hosted-agent and web-chat RBAC, remotely build the chat image in ACR, inject the three invocation endpoints into the Container App, and verify required variable names without displaying their values.
+After `azd up`, Bicep outputs and Foundry deployment outputs are persisted in the selected `azd` environment. The private profile uses an explicit provision-before-package workflow so the generated ACR endpoint exists before azd resolves passthrough image references. Its `preprovision` hook removes legacy Premium-only ACR resources when upgrading an existing environment, and its `predeploy` hook builds hosted-agent images with ordinary ACR Tasks. The `postup` hooks configure hosted-agent and web-chat RBAC, build the chat image in ACR, inject the three invocation endpoints into the Container App, and verify required variable names without displaying their values.
 
-Use a fresh environment because Foundry network injection cannot be changed after account creation. The `S` and `S0` tiers incur usage charges. See [infra/README.md](infra/README.md#provision-without-a-vnet) for infrastructure-only deployment, retry steps, and enterprise Storage policy considerations.
+Use a fresh environment when changing profiles because Foundry network injection cannot be changed after account creation. The `S` and `S0` tiers incur usage charges. See [infra/README.md](infra/README.md) for infrastructure-only deployment and retry steps.
 
 ### Agent Runtime RBAC
 
@@ -266,7 +278,7 @@ The `postup` hooks configure these assignments. `Cognitive Services Language Rea
 | --- | --- |
 | `Set AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT` | Update the local checkout, select the deployed `azd` environment, or provide `--endpoint`. |
 | `HTTP 401` or `HTTP 403` | Run `az login` with an identity authorized to invoke the hosted agent. |
-| `HTTP 422` with `HTTP 401 (PermissionDenied)` | Rerun `azd up`, or load `azd env get-values` into the process and run `scripts/configure_agent_rbac.py`; then allow time for RBAC propagation. |
+| `HTTP 422` with `HTTP 401 (PermissionDenied)` | Rerun `azd -C infra/<profile> up`, or load that profile's `azd env get-values` into the process and run `scripts/configure_agent_rbac.py`; then allow time for RBAC propagation. |
 | `FileExistsError` | Use `--overwrite` or select a new output folder. |
 | Invalid native document response | Preserve the prior output, inspect the hosted-agent trace, and do not rename text or JSON output as PDF/DOCX. |
 | Cannot query traces | Verify Azure RBAC for telemetry query access and the configured Azure Monitor network path. |

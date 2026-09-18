@@ -19,6 +19,7 @@ test-results/
 
 # Generated ARM templates from local Bicep compilation
 infra/main.json
+infra/*/main.json
 infra/modules/*.json
 
 # Generated redaction outputs
@@ -33,3 +34,4 @@ samples/output/*
 .vscode/*.log
 .DS_Store
 Thumbs.db
+.azure

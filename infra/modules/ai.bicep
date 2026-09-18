@@ -11,11 +11,14 @@ param docIntelligenceName string
 param aiLanguageSku string
 param docIntelligenceSku string
 param useVnet bool
+param allowPublicFoundryAccess bool
 param agentSubnetId string
 param logAnalyticsWorkspaceId string
 
 var publicNetworkAccess = useVnet ? 'Disabled' : 'Enabled'
 var networkDefaultAction = useVnet ? 'Deny' : 'Allow'
+var foundryPublicNetworkAccess = (!useVnet || allowPublicFoundryAccess) ? 'Enabled' : 'Disabled'
+var foundryNetworkDefaultAction = (!useVnet || allowPublicFoundryAccess) ? 'Allow' : 'Deny'
 
 // Microsoft Foundry AIServices account. Network injection must be configured
 // when this account is first created; it cannot be added later for hosted agents.
@@ -34,14 +37,14 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = 
   properties: union({
     allowProjectManagement: true
     customSubDomainName: aiServicesName
-    publicNetworkAccess: publicNetworkAccess
+    publicNetworkAccess: foundryPublicNetworkAccess
     networkAcls: {
-      defaultAction: networkDefaultAction
+      defaultAction: foundryNetworkDefaultAction
       bypass: 'AzureServices'
       ipRules: []
       virtualNetworkRules: []
     }
-    disableLocalAuth: false // Foundry may require key auth for initial setup
+    disableLocalAuth: true
   }, useVnet ? {
     networkInjections: [
       {

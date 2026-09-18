@@ -16,6 +16,9 @@ param location string = resourceGroup().location
 @description('Deploy with VNet injection, private endpoints, and private DNS. Set to false for public networking.')
 param useVnet bool = true
 
+@description('Allow authenticated public access to Foundry while retaining VNet injection and private endpoints.')
+param allowPublicFoundryAccess bool = true
+
 @description('VNet address space (CIDR)')
 param vnetAddressPrefix string = '10.40.0.0/16'
 
@@ -144,6 +147,7 @@ module documentStorage 'modules/documentStorage.bicep' = {
     tags: tags
     storageAccountName: resourceNames.documentStorage
     useVnet: useVnet
+    aiLanguageResourceId: ai.outputs.aiLanguageId
   }
 }
 
@@ -159,6 +163,7 @@ module ai 'modules/ai.bicep' = {
     aiLanguageSku: aiLanguageSku
     docIntelligenceSku: docIntelligenceSku
     useVnet: useVnet
+    allowPublicFoundryAccess: allowPublicFoundryAccess
     agentSubnetId: useVnet ? network!.outputs.agentSubnetId : ''
     logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsId
   }
@@ -174,7 +179,7 @@ module foundryMonitoringConnection 'modules/foundryMonitoringConnection.bicep' =
   }
 }
 
-// Private endpoints for AI services and Azure Monitor; ACR intentionally uses its public endpoint
+// Private endpoints for AI services and Azure Monitor; ACR uses its public endpoint.
 module privateEndpoints 'modules/privateEndpoints.bicep' = if (useVnet) {
   name: 'private-endpoints-deployment'
   params: {
@@ -223,6 +228,21 @@ module rbac 'modules/rbac.bicep' = {
   }
 }
 
+module foundryAcrConnection 'modules/foundryAcrConnection.bicep' = {
+  name: 'foundry-acr-connection'
+  params: {
+    aiServicesName: ai.outputs.aiServicesName
+    aiProjectName: foundryProject.outputs.aiProjectName
+    acrName: acr.outputs.acrName
+    acrEndpoint: acr.outputs.acrLoginServer
+    acrResourceId: acr.outputs.acrId
+    projectPrincipalId: foundryProject.outputs.aiProjectPrincipalId
+  }
+  dependsOn: [
+    rbac
+  ]
+}
+
 module redactionChat 'modules/redactionChat.bicep' = {
   name: 'redaction-chat-deployment'
   params: {
@@ -244,6 +264,7 @@ output AZURE_LOCATION string = location
 output AZURE_SUBSCRIPTION_ID string = subscription().subscriptionId
 output AZURE_TENANT_ID string = tenant().tenantId
 output USE_VNET string = string(useVnet)
+output ALLOW_PUBLIC_FOUNDRY_ACCESS string = string(allowPublicFoundryAccess)
 output VNET_ADDRESS_PREFIX string = vnetAddressPrefix
 output AGENT_SUBNET_PREFIX string = agentSubnetPrefix
 output PE_SUBNET_PREFIX string = privateEndpointSubnetPrefix
@@ -272,6 +293,7 @@ output AZURE_DOCUMENT_PII_TARGET_CONTAINER string = documentStorage.outputs.targ
 output AZURE_CONTAINER_REGISTRY_RESOURCE_ID string = acr.outputs.acrId
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = acr.outputs.acrLoginServer
 output AZURE_CONTAINER_REGISTRY_NAME string = acr.outputs.acrName
+output AZURE_AI_PROJECT_ACR_CONNECTION_NAME string = foundryAcrConnection.outputs.connectionName
 
 // Redaction chat
 output AZURE_REDACTION_CHAT_NAME string = redactionChat.outputs.appName

@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
-name: responsible-ai-guardrails
+name: responsible-ai-guardrails-private
 requiredVersions:
   azd: ">=1.27.1"
 extensions:
@@ -15,13 +15,11 @@ services:
     displayName: PII Redaction Agent
     description: Detects PII with Azure AI Language and redacts text, prompts, and responses.
     project: .
+    image: ${AZURE_CONTAINER_REGISTRY_ENDPOINT=bootstrap.invalid}/pii-redaction-agent:${AZURE_ENV_NAME}
     language: docker
     docker:
-      path: Dockerfile
-      context: .
-      remoteBuild: true
-      buildArgs:
-        - AGENT_MODULE=agents.pii_redaction.main
+      imagePassthrough: true
+      remoteBuild: false
     uses:
       - ai-project
     protocols:
@@ -46,13 +44,11 @@ services:
     displayName: Document Redaction Agent
     description: Redacts native documents with Azure AI Language document-based PII while preserving layout.
     project: .
+    image: ${AZURE_CONTAINER_REGISTRY_ENDPOINT=bootstrap.invalid}/document-redaction-agent:${AZURE_ENV_NAME}
     language: docker
     docker:
-      path: Dockerfile
-      context: .
-      remoteBuild: true
-      buildArgs:
-        - AGENT_MODULE=agents.document_redaction.main
+      imagePassthrough: true
+      remoteBuild: false
     uses:
       - ai-project
     protocols:
@@ -80,13 +76,11 @@ services:
     displayName: Image Redaction Agent
     description: Masks image pixels containing PII using Azure Document Intelligence OCR and Azure AI Language.
     project: .
+    image: ${AZURE_CONTAINER_REGISTRY_ENDPOINT=bootstrap.invalid}/image-redaction-agent:${AZURE_ENV_NAME}
     language: docker
     docker:
-      path: Dockerfile
-      context: .
-      remoteBuild: true
-      buildArgs:
-        - AGENT_MODULE=agents.image_redaction.main
+      imagePassthrough: true
+      remoteBuild: false
     uses:
       - ai-project
     protocols:
@@ -106,10 +100,19 @@ services:
         cpu: "0.5"
         memory: 1Gi
 infra:
-  path: infra
+  path: .
   module: main
+workflows:
+  up:
+    - azd: provision
+    - azd: package --all
+    - azd: deploy --all
 hooks:
+  preprovision:
+    - run: ./scripts/prepare_public_acr.py
+  predeploy:
+    - run: ./scripts/build_agent_images.py
   postup:
-    - run: scripts/configure_agent_rbac.py
-    - run: scripts/deploy_redaction_chat.py
-    - run: scripts/validate_azd_environment.py
+    - run: ./scripts/configure_agent_rbac.py
+    - run: ./scripts/deploy_redaction_chat.py
+    - run: ./scripts/validate_azd_environment.py

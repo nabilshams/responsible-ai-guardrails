@@ -1,5 +1,5 @@
 // Monitoring infrastructure: Log Analytics, Application Insights, Azure Monitor Private Link Scope
-// Ingestion remains private; authenticated queries are available to portal experiences.
+// Ingestion and queries remain private in VNet mode.
 
 targetScope = 'resourceGroup'
 
@@ -21,7 +21,7 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
     }
     retentionInDays: 30
     publicNetworkAccessForIngestion: useVnet ? 'Disabled' : 'Enabled'
-    publicNetworkAccessForQuery: 'Enabled'
+    publicNetworkAccessForQuery: useVnet ? 'Disabled' : 'Enabled'
   }
 }
 
@@ -35,7 +35,7 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
     Application_Type: 'web'
     WorkspaceResourceId: logAnalytics.id
     publicNetworkAccessForIngestion: useVnet ? 'Disabled' : 'Enabled'
-    publicNetworkAccessForQuery: 'Enabled'
+    publicNetworkAccessForQuery: useVnet ? 'Disabled' : 'Enabled'
   }
 }
 

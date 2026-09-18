@@ -5,6 +5,9 @@ param tags object
 param storageAccountName string
 param useVnet bool
 
+@description('Language account resource ID trusted to reach storage via a resource instance rule')
+param aiLanguageResourceId string = ''
+
 resource storage 'Microsoft.Storage/storageAccounts@2025-06-01' = {
   name: storageAccountName
   location: location
@@ -19,6 +22,8 @@ resource storage 'Microsoft.Storage/storageAccounts@2025-06-01' = {
     allowSharedKeyAccess: false
     defaultToOAuthAuthentication: true
     minimumTlsVersion: 'TLS1_2'
+    // The public endpoint stays on but denies by default; only the VNet private
+    // endpoint and the trusted Language account (resource instance rule) may reach it.
     publicNetworkAccess: 'Enabled'
     supportsHttpsTrafficOnly: true
     networkAcls: {
@@ -26,6 +31,12 @@ resource storage 'Microsoft.Storage/storageAccounts@2025-06-01' = {
       defaultAction: useVnet ? 'Deny' : 'Allow'
       ipRules: []
       virtualNetworkRules: []
+      resourceAccessRules: (useVnet && !empty(aiLanguageResourceId)) ? [
+        {
+          tenantId: tenant().tenantId
+          resourceId: aiLanguageResourceId
+        }
+      ] : []
     }
   }
 }

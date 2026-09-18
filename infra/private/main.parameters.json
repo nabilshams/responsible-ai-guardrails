@@ -1,0 +1,16 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": { "value": "${AZURE_ENV_NAME}" },
+    "location": { "value": "${AZURE_LOCATION=eastus2}" },
+    "vnetAddressPrefix": { "value": "${VNET_ADDRESS_PREFIX=10.40.0.0/16}" },
+    "agentSubnetPrefix": { "value": "${AGENT_SUBNET_PREFIX=10.40.0.0/24}" },
+    "privateEndpointSubnetPrefix": { "value": "${PE_SUBNET_PREFIX=10.40.1.0/24}" },
+    "webSubnetPrefix": { "value": "${WEB_SUBNET_PREFIX=10.40.2.0/24}" },
+    "aiLanguageSku": { "value": "${AI_LANGUAGE_SKU=S}" },
+    "docIntelligenceSku": { "value": "${DOCUMENT_INTELLIGENCE_SKU=S0}" },
+    "piiConfidenceThreshold": { "value": "${PII_CONFIDENCE_THRESHOLD=0.7}" },
+    "piiDefaultLanguage": { "value": "${PII_DEFAULT_LANGUAGE=en}" }
+  }
+}

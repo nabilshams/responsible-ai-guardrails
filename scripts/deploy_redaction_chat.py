@@ -82,14 +82,14 @@ def deploy_chat(values: Mapping[str, str], *, image_tag: str) -> None:
         f"{required['AZURE_CONTAINER_REGISTRY_ENDPOINT']}/"
         f"redaction-chat:{image_tag}"
     )
-    commands = (
+    build_command = [
+        "acr",
+        "build",
+        "--registry",
+        required["AZURE_CONTAINER_REGISTRY_NAME"],
+    ]
+    build_command.extend(
         (
-            "build image",
-            (
-            "acr",
-            "build",
-            "--registry",
-            required["AZURE_CONTAINER_REGISTRY_NAME"],
             "--image",
             f"redaction-chat:{image_tag}",
             "--file",
@@ -98,7 +98,12 @@ def deploy_chat(values: Mapping[str, str], *, image_tag: str) -> None:
             "--output",
             "none",
             str(REPOSITORY_ROOT),
-            ),
+        )
+    )
+    commands = (
+        (
+            "build image",
+            tuple(build_command),
         ),
         (
             "configure registry",

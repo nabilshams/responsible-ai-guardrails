@@ -1,5 +1,4 @@
-// Azure Container Registry - Basic tier with public network access
-// Admin and anonymous access remain disabled; image access uses Microsoft Entra RBAC
+// Standard Azure Container Registry with authenticated public network access.
 
 targetScope = 'resourceGroup'
 
@@ -8,13 +7,12 @@ param tags object
 param acrName string
 param logAnalyticsWorkspaceId string
 
-// Basic is the lowest ACR tier and is sufficient when Private Link is not required.
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: acrName
   location: location
   tags: tags
   sku: {
-    name: 'Basic'
+    name: 'Standard'
   }
   identity: {
     type: 'SystemAssigned'

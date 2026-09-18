@@ -23,6 +23,7 @@ resource environment 'Microsoft.App/managedEnvironments@2024-03-01' = {
   properties: useVnet ? {
     vnetConfiguration: {
       infrastructureSubnetId: infrastructureSubnetId
+      // VNet-injected workloads but a public load balancer so the chat is reachable externally.
       internal: false
     }
     zoneRedundant: false
@@ -82,4 +83,6 @@ output appName string = app.name
 output appPrincipalId string = app.identity.principalId
 output appUrl string = 'https://${app.properties.configuration.ingress.fqdn}'
 output environmentName string = environment.name
+output environmentDefaultDomain string = environment.properties.defaultDomain
+output environmentStaticIp string = environment.properties.staticIp
 output acrPullRoleAssignmentId string = acrPullRoleAssignment.id

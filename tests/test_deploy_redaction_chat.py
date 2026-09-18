@@ -65,6 +65,24 @@ def test_reports_only_missing_variable_names() -> None:
     )
 
 
+def test_ignores_legacy_private_agent_pool_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    commands: list[tuple[str, ...]] = []
+    monkeypatch.setattr(
+        deploy_redaction_chat,
+        "run_azure_cli",
+        lambda arguments, *, timeout=120: commands.append(arguments) or completed(),
+    )
+    monkeypatch.setattr(deploy_redaction_chat, "wait_for_image", lambda *args: None)
+    values = deployment_environment()
+    values["AZURE_CONTAINER_REGISTRY_AGENT_POOL_NAME"] = "synthetic-agent-pool"
+
+    deploy_redaction_chat.deploy_chat(values, image_tag="synthetic-tag")
+
+    assert "--agent-pool" not in commands[0]
+
+
 def test_uses_value_blind_failure_message(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         deploy_redaction_chat,

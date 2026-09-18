@@ -5,17 +5,17 @@
 1. Create `.venv` and install `requirements-dev.txt`.
 2. Copy `.env.example` to `.env`.
 3. Configure `AZURE_AI_LANGUAGE_ENDPOINT` for all agents and `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` for document/image agents; authentication uses `DefaultAzureCredential`.
-4. Hosted-agent images are built remotely by Azure Container Registry Tasks. A local Docker daemon is not required.
+4. Hosted agents are Docker containers built remotely in Azure Container Registry. The web chat image also uses an Azure Container Registry Task. Neither path requires a local Docker daemon.
 5. Select the desired specialist debug profile and press F5 to start its Invocations protocol host on port 8088 and open Agent Inspector.
 6. Run `python -m agents.pii_redaction.run_api` for the optional REST adapter on port 8000.
 
 ## Azure Infrastructure Provisioning
 
-This solution uses custom Bicep templates with a `USE_VNET` switch for either public networking or VNet isolation.
+This solution provides two independent azd projects: `infra/private` for VNet-backed private networking and `infra/public` for public networking. Their network modes are fixed in Bicep and cannot be changed through environment variables.
 
 ### Prerequisites
 
-- **Execution environment**: VNet mode requires a VM, Azure Bastion, Azure DevOps agent, or GitHub self-hosted runner with target VNet connectivity; public mode can deploy from a normal authenticated workstation
+- **Execution environment**: VNet deployments require a VNet-connected VM, self-hosted runner, VPN, or ExpressRoute path; public deployments can run from an authenticated workstation
 - **Azure CLI**: Version 2.50.0 or newer
 - **Azure Developer CLI (azd)**: Version 1.27.1 or newer
 - **Permissions**: Contributor plus Role Based Access Administrator, or Owner, so the deployment can create scoped RBAC assignments
@@ -24,10 +24,11 @@ This solution uses custom Bicep templates with a `USE_VNET` switch for either pu
 
 The Bicep templates provision:
 
-- **Private network in VNet mode**: VNet (default 10.40.0.0/16) with agent subnet (10.40.0.0/24, delegated to Microsoft.App/environments) and private endpoint subnet (10.40.1.0/24)
-- **AI Services**: Microsoft Foundry AIServices, Azure AI Language, and Document Intelligence use private endpoints in VNet mode and authenticated public endpoints in public mode
-- **Container Registry**: Basic Azure Container Registry with public network access, admin user disabled, and Microsoft Entra RBAC
-- **Monitoring**: Application Insights and Log Analytics in both modes; Azure Monitor Private Link Scope in VNet mode
+- **Private network in VNet mode**: VNet (default 10.40.0.0/16) with agent, private endpoint, and redaction chat subnets
+- **AI Services**: Foundry retains its private endpoint and VNet injection but permits authenticated public access in VNet mode; Azure AI Language and Document Intelligence disable public access
+- **Container Registry**: Standard ACR with public network access in both profiles; admin access is disabled and image pulls use managed identities
+- **Redaction chat**: Internal Container Apps environment with private DNS in VNet mode; public ingress in public mode
+- **Monitoring**: Application Insights and Log Analytics in both modes; ingestion and query access use Azure Monitor Private Link Scope in VNet mode
 - **Private DNS in VNet mode**: Private DNS zones linked to the VNet for automatic private endpoint resolution
 - **RBAC**: Foundry project identity receives ACR pull access; each agent runtime identity receives only its required Cognitive Services User and Storage Blob Data Contributor assignments
 
@@ -38,53 +39,53 @@ See [`infra/README.md`](../infra/README.md) for detailed architecture and module
 Default values (customizable via azd environment variables):
 
 - **Region**: East US 2
-- **Network mode**: VNet isolation by default; set `USE_VNET=false` for public networking
+- **Network mode**: The VNet profile permits authenticated public access to Foundry and ACR while disabling public access for the redaction chat and dependent services
 - **VNet CIDR**: 10.40.0.0/16
 - **Agent subnet**: 10.40.0.0/24
 - **Private endpoint subnet**: 10.40.1.0/24
+- **Redaction chat subnet**: 10.40.2.0/24
 - **No generative model deployment**: This template provisions deterministic PII detection only
-- **Cost-minimized SKUs**: Language F0, Document Intelligence F0, Foundry AIServices S0, Basic ACR, and pay-as-you-go Log Analytics
+- **Container Registry**: Standard public ACR in both profiles, with admin and anonymous access disabled
 - **Hosted-agent compute**: 0.5 vCPU and 1 GiB memory per specialist
 
-ACR uses the lowest `Basic` tier and intentionally does not use Private Link. Its public endpoint is required for image push/pull, while Microsoft Entra RBAC and a disabled admin account protect access. Foundry AIServices remains S0. Language and Document Intelligence use F0 development defaults. Free-tier resource count and regional availability restrictions apply. For production volume, set `AI_LANGUAGE_SKU=S` and `DOCUMENT_INTELLIGENCE_SKU=S0` before provisioning.
+Both profiles use ordinary remote ACR builds against a Standard registry with public network access. The private profile's custom `azd up` workflow provisions before packaging so the generated registry endpoint is available when passthrough image references are resolved. Registry access is authenticated through Azure RBAC; no admin credentials or anonymous pulls are enabled. Docker Desktop is not required for either profile.
 
-### Deployment Steps
+### VNet Deployment
 
 ```powershell
-# 1. Initialize azd environment
-azd init
-
-# 2. Configure environment
-azd env set AZURE_ENV_NAME "rai-prod"
-azd env set AZURE_LOCATION "eastus2"
-azd env set USE_VNET "true"
+$env:AZURE_DEV_USER_AGENT = "microsoft_foundry_skill"
+azd -C infra/private env new "rai-private" --location "eastus2"
 
 # 3. Optional: override network defaults
-azd env set VNET_ADDRESS_PREFIX "10.50.0.0/16"
-azd env set AGENT_SUBNET_PREFIX "10.50.0.0/24"
-azd env set PE_SUBNET_PREFIX "10.50.1.0/24"
+azd -C infra/private env set VNET_ADDRESS_PREFIX "10.50.0.0/16"
+azd -C infra/private env set AGENT_SUBNET_PREFIX "10.50.0.0/24"
+azd -C infra/private env set PE_SUBNET_PREFIX "10.50.1.0/24"
+azd -C infra/private env set WEB_SUBNET_PREFIX "10.50.2.0/24"
 
 # Optional: use paid tiers for production volume
-azd env set AI_LANGUAGE_SKU "S"
-azd env set DOCUMENT_INTELLIGENCE_SKU "S0"
+azd -C infra/private env set AI_LANGUAGE_SKU "S"
+azd -C infra/private env set DOCUMENT_INTELLIGENCE_SKU "S0"
 
 # 4. Preview infrastructure changes (recommended)
-azd provision --preview
+azd -C infra/private provision --preview
 
 # 5. Provision and deploy in one step
-azd up --no-prompt
+azd -C infra/private up --no-prompt
 ```
 
-For public networking, create a separate environment and use:
+Run these commands from a VNet-connected execution environment because the deployment hooks and supporting services require private network reachability. The Foundry endpoint permits authenticated public access, but Microsoft Entra authentication and project RBAC remain required and local authentication is disabled. The redaction chat, ACR, Azure AI Language, Document Intelligence, Storage, and monitoring have no public data-plane access in this profile.
+
+### Public Deployment
+
+Create a separate environment under the public profile:
 
 ```powershell
-azd env new rai-public
-azd env set AZURE_LOCATION "eastus2"
-azd env set USE_VNET "false"
-azd up --no-prompt
+$env:AZURE_DEV_USER_AGENT = "microsoft_foundry_skill"
+azd -C infra/public env new "rai-public" --location "eastus2"
+azd -C infra/public up --no-prompt
 ```
 
-Do not change `USE_VNET` for an existing Foundry account. Hosted Agent network injection cannot be added or changed after account creation; use a new azd environment when switching modes.
+Do not reuse an environment across the two folders. Hosted Agent network injection cannot be added or changed after account creation.
 
 ### Post-Deployment: Agent Identity RBAC
 
@@ -176,8 +177,8 @@ The deployment workflow uses OIDC authentication. VNet mode requires a **self-ho
 1. Checkout code
 2. Authenticate with Azure using OIDC
 3. Authenticate azd with federated credential
-4. Run `azd provision --preview` to preview changes
-5. Run `azd up --no-prompt` to provision and deploy
+4. Select the `private` or `public` workflow profile
+5. Preview and deploy through that profile's `infra/<profile>` azd project
 
 No secrets are stored in the repository; all authentication uses OIDC federation.
 
@@ -187,7 +188,7 @@ For Azure DevOps pipelines in VNet mode:
 
 1. Use a self-hosted agent in the VNet or with private endpoint access
 2. Configure a service connection with managed identity or federated credential
-3. Run `azd provision` and `azd deploy` tasks in sequence
+3. Run `azd -C infra/private provision` and `azd -C infra/private deploy` in sequence
 4. Validate private endpoint connectivity before deployment
 
 ## Invocation Payloads

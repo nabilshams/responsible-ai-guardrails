@@ -1,0 +1,112 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+name: responsible-ai-guardrails-public
+requiredVersions:
+  azd: ">=1.27.1"
+extensions:
+  azure.ai.agents: ">=1.0.0-beta.9"
+services:
+  ai-project:
+    host: azure.ai.project
+    deployments: []
+  pii-redaction-agent:
+    host: azure.ai.agent
+    kind: hosted
+    name: pii-redaction-agent
+    displayName: PII Redaction Agent
+    description: Detects PII with Azure AI Language and redacts text, prompts, and responses.
+    project: ../..
+    language: docker
+    docker:
+      path: Dockerfile
+      remoteBuild: true
+      buildArgs:
+        - AGENT_MODULE=agents.pii_redaction.main
+    uses:
+      - ai-project
+    protocols:
+      - protocol: invocations
+        version: 1.0.0
+    metadata:
+      tags:
+        - Responsible AI
+        - PII
+        - Data Protection
+    env:
+      PII_CONFIDENCE_THRESHOLD: ${PII_CONFIDENCE_THRESHOLD}
+      AZURE_AI_LANGUAGE_ENDPOINT: ${AZURE_AI_LANGUAGE_ENDPOINT}
+    container:
+      resources:
+        cpu: "0.5"
+        memory: 1Gi
+  document-redaction-agent:
+    host: azure.ai.agent
+    kind: hosted
+    name: document-redaction-agent
+    displayName: Document Redaction Agent
+    description: Redacts native documents with Azure AI Language document-based PII while preserving layout.
+    project: ../..
+    language: docker
+    docker:
+      path: Dockerfile
+      remoteBuild: true
+      buildArgs:
+        - AGENT_MODULE=agents.document_redaction.main
+    uses:
+      - ai-project
+    protocols:
+      - protocol: invocations
+        version: 1.0.0
+    metadata:
+      tags:
+        - Responsible AI
+        - Document Redaction
+        - Data Protection
+    env:
+      PII_CONFIDENCE_THRESHOLD: ${PII_CONFIDENCE_THRESHOLD}
+      AZURE_AI_LANGUAGE_ENDPOINT: ${AZURE_AI_LANGUAGE_ENDPOINT}
+      AZURE_DOCUMENT_PII_STORAGE_ENDPOINT: ${AZURE_DOCUMENT_PII_STORAGE_ENDPOINT}
+      AZURE_DOCUMENT_PII_SOURCE_CONTAINER: ${AZURE_DOCUMENT_PII_SOURCE_CONTAINER}
+      AZURE_DOCUMENT_PII_TARGET_CONTAINER: ${AZURE_DOCUMENT_PII_TARGET_CONTAINER}
+    container:
+      resources:
+        cpu: "0.5"
+        memory: 1Gi
+  image-redaction-agent:
+    host: azure.ai.agent
+    kind: hosted
+    name: image-redaction-agent
+    displayName: Image Redaction Agent
+    description: Masks image pixels containing PII using Azure Document Intelligence OCR and Azure AI Language.
+    project: ../..
+    language: docker
+    docker:
+      path: Dockerfile
+      remoteBuild: true
+      buildArgs:
+        - AGENT_MODULE=agents.image_redaction.main
+    uses:
+      - ai-project
+    protocols:
+      - protocol: invocations
+        version: 1.0.0
+    metadata:
+      tags:
+        - Responsible AI
+        - Image Redaction
+        - Data Protection
+    env:
+      PII_CONFIDENCE_THRESHOLD: ${PII_CONFIDENCE_THRESHOLD}
+      AZURE_AI_LANGUAGE_ENDPOINT: ${AZURE_AI_LANGUAGE_ENDPOINT}
+      AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT: ${AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT}
+    container:
+      resources:
+        cpu: "0.5"
+        memory: 1Gi
+infra:
+  path: .
+  module: main
+hooks:
+  postup:
+    - run: ./scripts/configure_agent_rbac.py
+    - run: ./scripts/deploy_redaction_chat.py
+    - run: ./scripts/validate_azd_environment.py

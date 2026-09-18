@@ -11,6 +11,7 @@ _REQUIRED_VARIABLES = (
     "AZURE_SUBSCRIPTION_ID",
     "AZURE_TENANT_ID",
     "USE_VNET",
+    "ALLOW_PUBLIC_FOUNDRY_ACCESS",
     "VNET_ADDRESS_PREFIX",
     "AGENT_SUBNET_PREFIX",
     "PE_SUBNET_PREFIX",
@@ -71,7 +72,14 @@ def find_missing_variables(values: Mapping[str, str]) -> list[str]:
 
     use_vnet = values.get("USE_VNET", "").strip().lower() == "true"
     if use_vnet:
-        required.extend(("VNET_ID", "AGENT_SUBNET_ID", "PE_SUBNET_ID", "WEB_SUBNET_ID"))
+        required.extend(
+            (
+                "VNET_ID",
+                "AGENT_SUBNET_ID",
+                "PE_SUBNET_ID",
+                "WEB_SUBNET_ID",
+            )
+        )
 
     return sorted(name for name in required if not values.get(name, "").strip())
 

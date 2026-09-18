@@ -7,6 +7,14 @@ on:
         description: GitHub environment containing Azure OIDC variables
         required: true
         default: dev
+      profile:
+        description: Deployment network profile
+        required: true
+        default: private
+        type: choice
+        options:
+          - private
+          - public
 
 permissions:
   id-token: write
@@ -33,12 +41,12 @@ jobs:
         env:
           AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
       - name: Select environment
-        run: azd env select "${{ inputs.environment }}" || azd env new "${{ inputs.environment }}" --no-prompt
+        run: azd -C "infra/${{ inputs.profile }}" env select "${{ inputs.environment }}" || azd -C "infra/${{ inputs.profile }}" env new "${{ inputs.environment }}" --no-prompt
       - name: Configure deployment
         run: |
-          azd env set AZURE_SUBSCRIPTION_ID "${{ vars.AZURE_SUBSCRIPTION_ID }}"
-          azd env set AZURE_LOCATION "${{ vars.AZURE_LOCATION }}"
+          azd -C "infra/${{ inputs.profile }}" env set AZURE_SUBSCRIPTION_ID "${{ vars.AZURE_SUBSCRIPTION_ID }}"
+          azd -C "infra/${{ inputs.profile }}" env set AZURE_LOCATION "${{ vars.AZURE_LOCATION }}"
       - name: Preview infrastructure changes
-        run: azd provision --preview --no-prompt
+        run: azd -C "infra/${{ inputs.profile }}" provision --preview --no-prompt
       - name: Provision and deploy
-        run: azd up --no-prompt
+        run: azd -C "infra/${{ inputs.profile }}" up --no-prompt
