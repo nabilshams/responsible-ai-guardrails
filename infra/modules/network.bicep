@@ -11,6 +11,8 @@ param agentSubnetName string
 param agentSubnetPrefix string
 param peSubnetName string
 param peSubnetPrefix string
+param webSubnetName string
+param webSubnetPrefix string
 param nsgAgentName string
 param nsgPeName string
 
@@ -177,6 +179,25 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
           privateEndpointNetworkPolicies: 'Disabled'
         }
       }
+      {
+        name: webSubnetName
+        properties: {
+          addressPrefix: webSubnetPrefix
+          networkSecurityGroup: {
+            id: nsgAgent.id
+          }
+          delegations: [
+            {
+              name: 'Microsoft.App.environments'
+              properties: {
+                serviceName: 'Microsoft.App/environments'
+              }
+            }
+          ]
+          serviceEndpoints: []
+          privateEndpointNetworkPolicies: 'Disabled'
+        }
+      }
     ]
   }
 }
@@ -185,3 +206,4 @@ output vnetId string = vnet.id
 output vnetName string = vnet.name
 output agentSubnetId string = '${vnet.id}/subnets/${agentSubnetName}'
 output peSubnetId string = '${vnet.id}/subnets/${peSubnetName}'
+output webSubnetId string = '${vnet.id}/subnets/${webSubnetName}'

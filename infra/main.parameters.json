@@ -20,6 +20,9 @@
     "privateEndpointSubnetPrefix": {
       "value": "${PE_SUBNET_PREFIX=10.40.1.0/24}"
     },
+    "webSubnetPrefix": {
+      "value": "${WEB_SUBNET_PREFIX=10.40.2.0/24}"
+    },
     "aiLanguageSku": {
       "value": "${AI_LANGUAGE_SKU=S}"
     },

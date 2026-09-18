@@ -25,6 +25,9 @@ param agentSubnetPrefix string = '10.40.0.0/24'
 @description('Private endpoint subnet address range')
 param privateEndpointSubnetPrefix string = '10.40.1.0/24'
 
+@description('Redaction chat Container Apps infrastructure subnet address range')
+param webSubnetPrefix string = '10.40.2.0/24'
+
 @allowed([
   'F0'
   'S'
@@ -63,6 +66,7 @@ var resourceNames = {
   vnet: '${abbrs.networkVirtualNetworks}${environmentName}'
   agentSubnet: 'snet-agent'
   peSubnet: 'snet-pe'
+  webSubnet: 'snet-web'
   nsgAgent: '${abbrs.networkNetworkSecurityGroups}agent-${environmentName}'
   nsgPe: '${abbrs.networkNetworkSecurityGroups}pe-${environmentName}'
   acr: take('cr${normalizedEnvironmentName}${uniqueSuffix}', 50)
@@ -74,6 +78,8 @@ var resourceNames = {
   logAnalytics: '${abbrs.operationalInsightsWorkspaces}${environmentName}'
   appInsights: '${abbrs.insightsComponents}${environmentName}'
   ampls: 'ampls-${environmentName}'
+  containerAppsEnvironment: 'cae-${environmentName}'
+  redactionChat: take('ca-redaction-chat-${normalizedEnvironmentName}-${uniqueSuffix}', 32)
 }
 
 // ========== MODULES ==========
@@ -90,6 +96,8 @@ module network 'modules/network.bicep' = if (useVnet) {
     agentSubnetPrefix: agentSubnetPrefix
     peSubnetName: resourceNames.peSubnet
     peSubnetPrefix: privateEndpointSubnetPrefix
+    webSubnetName: resourceNames.webSubnet
+    webSubnetPrefix: webSubnetPrefix
     nsgAgentName: resourceNames.nsgAgent
     nsgPeName: resourceNames.nsgPe
   }
@@ -215,6 +223,19 @@ module rbac 'modules/rbac.bicep' = {
   }
 }
 
+module redactionChat 'modules/redactionChat.bicep' = {
+  name: 'redaction-chat-deployment'
+  params: {
+    location: location
+    tags: tags
+    environmentName: resourceNames.containerAppsEnvironment
+    appName: resourceNames.redactionChat
+    acrId: acr.outputs.acrId
+    useVnet: useVnet
+    infrastructureSubnetId: useVnet ? network!.outputs.webSubnetId : ''
+  }
+}
+
 // ========== OUTPUTS (azd environment variables) ==========
 
 // Deployment context and selected options
@@ -226,6 +247,7 @@ output USE_VNET string = string(useVnet)
 output VNET_ADDRESS_PREFIX string = vnetAddressPrefix
 output AGENT_SUBNET_PREFIX string = agentSubnetPrefix
 output PE_SUBNET_PREFIX string = privateEndpointSubnetPrefix
+output WEB_SUBNET_PREFIX string = webSubnetPrefix
 output AI_LANGUAGE_SKU string = aiLanguageSku
 output DOCUMENT_INTELLIGENCE_SKU string = docIntelligenceSku
 
@@ -251,6 +273,12 @@ output AZURE_CONTAINER_REGISTRY_RESOURCE_ID string = acr.outputs.acrId
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = acr.outputs.acrLoginServer
 output AZURE_CONTAINER_REGISTRY_NAME string = acr.outputs.acrName
 
+// Redaction chat
+output AZURE_REDACTION_CHAT_NAME string = redactionChat.outputs.appName
+output AZURE_REDACTION_CHAT_PRINCIPAL_ID string = redactionChat.outputs.appPrincipalId
+output AZURE_REDACTION_CHAT_URL string = redactionChat.outputs.appUrl
+output AZURE_CONTAINER_APPS_ENVIRONMENT_NAME string = redactionChat.outputs.environmentName
+
 // Monitoring
 output APPLICATIONINSIGHTS_CONNECTION_STRING string = monitoring.outputs.appInsightsConnectionString
 output AZURE_LOG_ANALYTICS_WORKSPACE_ID string = monitoring.outputs.logAnalyticsId
@@ -259,6 +287,7 @@ output AZURE_LOG_ANALYTICS_WORKSPACE_ID string = monitoring.outputs.logAnalytics
 output VNET_ID string = useVnet ? network!.outputs.vnetId : ''
 output AGENT_SUBNET_ID string = useVnet ? network!.outputs.agentSubnetId : ''
 output PE_SUBNET_ID string = useVnet ? network!.outputs.peSubnetId : ''
+output WEB_SUBNET_ID string = useVnet ? network!.outputs.webSubnetId : ''
 output AZURE_RESOURCE_GROUP string = resourceGroup().name
 
 // Environment config (agent configuration values)

@@ -50,6 +50,12 @@ ROLE_ASSIGNMENTS = (
         "AZURE_DOCUMENT_INTELLIGENCE_RESOURCE_ID",
         "Cognitive Services User",
     ),
+    RoleAssignment(
+        "Redaction Chat",
+        "AZURE_REDACTION_CHAT_PRINCIPAL_ID",
+        "AZURE_AI_PROJECT_ID",
+        "Foundry User",
+    ),
 )
 
 

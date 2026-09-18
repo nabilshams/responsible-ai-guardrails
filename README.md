@@ -91,44 +91,45 @@ Place authorized files directly in [samples/input](samples/input). Do not place 
 
 ### Developer Access To Hosted Agents
 
-A public agent endpoint is network-reachable but does not allow anonymous invocation. Every developer must authenticate with Microsoft Entra ID and have the **Foundry Agent Consumer** role. This is separate from the runtime identity permissions described below.
-
-Use the narrowest appropriate scope:
-
-- **One agent:** Assign the role at that agent's scope. This is the recommended option for developers who need only one endpoint.
-- **All agents in this project:** Assign the role at the Foundry project scope.
+A public agent endpoint is network-reachable but does not allow anonymous invocation. Every developer must authenticate with Microsoft Entra ID and have the **Foundry User** role at the Foundry project scope. This is separate from the runtime identity permissions described below.
 
 A developer can assign this role to themselves only when they already have permission to create Azure role assignments, such as **Owner**, **User Access Administrator**, or **Role Based Access Control Administrator** at the applicable scope. Otherwise, an authorized administrator must run the command for them.
 
-Authenticate and assign access to only the Document Redaction Agent:
+Authenticate and assign project access:
 
 ```powershell
 az login
 
 $developerObjectId = az ad signed-in-user show --query id --output tsv
 $projectScope = azd env get-value AZURE_AI_PROJECT_ID
-$agentScope = "$projectScope/agents/document-redaction-agent"
 
 az role assignment create `
   --assignee-object-id $developerObjectId `
   --assignee-principal-type User `
-  --role "Foundry Agent Consumer" `
-  --scope $agentScope `
-  --output none
-```
-
-To allow the developer to invoke every hosted agent in this Foundry project, use the project scope instead:
-
-```powershell
-az role assignment create `
-  --assignee-object-id $developerObjectId `
-  --assignee-principal-type User `
-  --role "Foundry Agent Consumer" `
+  --role "Foundry User" `
   --scope $projectScope `
   --output none
 ```
 
 Role assignments can take several minutes to propagate. The developer must run `az login` as the same identity before invoking an agent through the scripts in this repository. Do not grant **Owner** or **Contributor** merely to invoke an agent.
+
+### Web Chat
+
+The local web chat accepts text and up to 10 supported files per request. It routes each item to the deployed text, document, or image specialist and returns redacted files as downloads. Azure credentials and agent endpoints remain in the local Python process; the browser does not receive them.
+
+`azd up` also deploys this interface to Azure Container Apps. The backend uses a system-assigned managed identity with `Foundry User` at the project scope; the browser still receives no credentials or agent endpoints. Open the deployed URL without printing the rest of the environment:
+
+```powershell
+azd env get-value AZURE_REDACTION_CHAT_URL
+```
+
+With the deployed `azd` environment selected, start the web app:
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.redaction_chat_app
+```
+
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000), enter text or attach `.txt`, `.csv`, `.json`, `.xml`, `.md`, `.log`, `.docx`, `.pdf`, `.png`, `.jpg`, or `.jpeg` files, and select **Redact**. Original text and filenames are not added to the conversation history; returned text and files contain the redacted results.
 
 ### PowerShell
 
@@ -242,14 +243,9 @@ azd env set PII_DEFAULT_LANGUAGE "en"
 
 azd provision --preview
 azd up --no-prompt
-
-if ($LASTEXITCODE -eq 0) {
-  $env:AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT = `
-    azd env get-value AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT
-}
 ```
 
-After `azd up`, Bicep outputs and Foundry deployment outputs are persisted in the selected `azd` environment. The conditional block also loads the Document Redaction Agent endpoint into the current PowerShell process; child processes started from that terminal inherit it. The `postup` hooks configure hosted-agent RBAC and verify all required variable names without displaying their values; use `azd env get-values` to inspect them locally.
+After `azd up`, Bicep outputs and Foundry deployment outputs are persisted in the selected `azd` environment. The `postup` hooks configure hosted-agent and web-chat RBAC, remotely build the chat image in ACR, inject the three invocation endpoints into the Container App, and verify required variable names without displaying their values.
 
 Use a fresh environment because Foundry network injection cannot be changed after account creation. The `S` and `S0` tiers incur usage charges. See [infra/README.md](infra/README.md#provision-without-a-vnet) for infrastructure-only deployment, retry steps, and enterprise Storage policy considerations.
 

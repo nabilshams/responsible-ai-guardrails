@@ -21,7 +21,8 @@ def resolve_endpoint(
     explicit_endpoint: str | None = None,
 ) -> str:
     """Resolve an endpoint without displaying its value."""
-    endpoint = (explicit_endpoint or os.getenv(variable_name, "")).strip()
+    endpoint = explicit_endpoint or os.getenv(variable_name) or ""
+    endpoint = endpoint.strip()
     if endpoint:
         return endpoint
 

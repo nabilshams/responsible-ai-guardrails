@@ -9,6 +9,7 @@ The infrastructure provisions:
 - **Network when `USE_VNET=true`**: VNet (10.40.0.0/16) with dedicated subnets:
   - Agent subnet (10.40.0.0/24) delegated to `Microsoft.App/environments`
   - Private endpoint subnet (10.40.1.0/24)
+  - Redaction chat subnet (10.40.2.0/24) delegated to `Microsoft.App/environments`
   - Network Security Groups with minimal safe rules
 
 - **AI Services**:
@@ -19,6 +20,7 @@ The infrastructure provisions:
 - **Container Infrastructure**:
   - Azure Container Registry Basic with public network access, Microsoft Entra RBAC, and no admin/anonymous access
   - ACR pull access granted to the Foundry project identity
+  - Azure Container Apps Consumption environment and externally accessible redaction chat with a system-assigned managed identity
 
 - **Monitoring**:
   - Log Analytics workspace and Application Insights in both modes
@@ -48,6 +50,7 @@ The `main.parameters.json` file defines azd environment variable bindings:
 - `VNET_ADDRESS_PREFIX`: VNet CIDR (default: `10.40.0.0/16`)
 - `AGENT_SUBNET_PREFIX`: Agent subnet CIDR (default: `10.40.0.0/24`)
 - `PE_SUBNET_PREFIX`: Private endpoint subnet CIDR (default: `10.40.1.0/24`)
+- `WEB_SUBNET_PREFIX`: Redaction chat subnet CIDR (default: `10.40.2.0/24`)
 - `AI_LANGUAGE_SKU`: Language tier (default: `F0`; set to `S` for production volume)
 
 ### Cost-Minimized Defaults
@@ -59,6 +62,7 @@ The template uses the lowest tiers compatible with each resource role:
 - Log Analytics remains pay-as-you-go (`PerGB2018`); Application Insights has no separate capacity SKU.
 - Azure AI Language defaults to `F0`. Azure permits only a limited number of free-tier resources per subscription, and regional availability can vary. Override the SKU when deployment validation reports that F0 is unavailable.
 - Hosted-agent compute is 0.5 vCPU and 1 GiB memory.
+- The redaction chat scales from zero to two replicas at 0.5 vCPU and 1 GiB per replica.
 
 The free tier is intended for development and evaluation. Language F0 provides 5,000 free text records per month. Use `AI_LANGUAGE_SKU=S` for production volume.
 
@@ -77,6 +81,7 @@ azd env set USE_VNET "true"
 azd env set VNET_ADDRESS_PREFIX "10.50.0.0/16"
 azd env set AGENT_SUBNET_PREFIX "10.50.0.0/24"
 azd env set PE_SUBNET_PREFIX "10.50.1.0/24"
+azd env set WEB_SUBNET_PREFIX "10.50.2.0/24"
 
 # Optional: opt into the paid production tier
 azd env set AI_LANGUAGE_SKU "S"
@@ -143,7 +148,7 @@ azd up --no-prompt
 
 - `azd provision` writes Azure context, selected deployment settings, resource IDs, and service endpoints from Bicep outputs.
 - `azd deploy` writes each hosted agent's name, version, runtime identity, and invocation endpoint.
-- The `postup` hook validates the required variable names without printing their values. It fails the workflow if the environment handoff is incomplete.
+- The `postup` hooks configure managed-identity RBAC, remotely build and deploy the redaction chat, inject agent endpoints into its server-side environment, and validate required variable names without printing their values.
 
 Defaults such as network prefixes, SKUs, `PII_CONFIDENCE_THRESHOLD`, and `PII_DEFAULT_LANGUAGE` are also emitted as outputs, so they appear in `azd env get-values` even when the user did not set them explicitly. Public deployments retain empty VNet resource IDs by design.
 
@@ -174,10 +179,11 @@ The Bicep templates configure ACR pull access for the Foundry project identity a
 | Document Redaction Agent | Temporary document Storage account | Storage Blob Data Contributor |
 | Image Redaction Agent | Azure AI Language | Cognitive Services User |
 | Image Redaction Agent | Document Intelligence | Cognitive Services User |
+| Redaction Chat | Foundry project | Foundry User |
 
 Use resource-level scopes rather than the resource group or subscription. `Cognitive Services Language Reader` does not include the native `/language/analyze-documents/jobs` operation and is not sufficient for PDF, DOCX, or TXT redaction.
 
-The hook is idempotent. Azure CLI must be installed and authenticated with permission to read and create role assignments. After a standalone `azd deploy`, rerun the hook because a new agent version can have a new runtime identity:
+The hooks are idempotent. Azure CLI must be installed and authenticated with permission to read and create role assignments, run ACR builds, and update the Container App. After a standalone `azd deploy`, rerun both hooks because a new agent version can have a new runtime identity or endpoint:
 
 ```powershell
 az login
@@ -187,6 +193,7 @@ azd env get-values | ForEach-Object {
   }
 }
 .\.venv\Scripts\python.exe scripts\configure_agent_rbac.py
+.\.venv\Scripts\python.exe scripts\deploy_redaction_chat.py
 ```
 
 ### Manual recovery
@@ -268,12 +275,13 @@ Invoke-RestMethod -Method Post -Uri "https://your-agent-endpoint/invoke" `
 | `modules/foundryMonitoringConnection.bicep` | Foundry observability | Shared Application Insights connection |
 | `modules/privateEndpoints.bicep` | Private connectivity | 3 private endpoints with DNS groups |
 | `modules/rbac.bicep` | Access control | ACR pull role for AI Services |
+| `modules/redactionChat.bicep` | Web redaction host | Container Apps environment, app identity, ingress, and ACR pull |
 
 ## Security Notes
 
 - **No secrets in source control**: All authentication uses managed identities or DefaultAzureCredential
 - **Explicit network posture**: `USE_VNET=true` makes Foundry and supporting data-plane services private; `USE_VNET=false` enables their public endpoints while retaining Microsoft Entra authentication and disabled shared-key access where supported
-- **Least privilege**: The Foundry project identity has ACR pull; hosted runtime identities receive only the resource-scoped Cognitive Services User and Storage Blob Data Contributor roles listed above
+- **Least privilege**: The Foundry project and web identities have ACR pull only where needed; hosted runtime identities receive the listed resource-scoped roles; the web identity receives Foundry User only at the project scope
 - **Audit logs**: All resources send diagnostics to Log Analytics
 - **Network isolation**: NSGs enforce minimal safe rules; egress to Azure services via service tags
 
@@ -290,6 +298,7 @@ Invoke-RestMethod -Method Post -Uri "https://your-agent-endpoint/invoke" `
 - Foundry account/project: `2025-04-01-preview`
 - Azure AI Language: `2024-10-01`
 - Container Registry: `2023-07-01`
+- Container Apps: `2024-03-01`
 - Network resources: `2024-05-01` / `2024-06-01`
 - OperationalInsights/workspaces: `2023-09-01`
 - Insights components: `2020-02-02`

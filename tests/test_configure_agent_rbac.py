@@ -32,6 +32,13 @@ def test_creates_each_missing_assignment(monkeypatch: pytest.MonkeyPatch) -> Non
 
     assert created == len(configure_agent_rbac.ROLE_ASSIGNMENTS)
     assert sum(command[2] == "create" for command in commands) == created
+    assert any(
+        "Foundry User" in command
+        and "AZURE_AI_PROJECT_ID" not in command
+        and "synthetic-id" in command
+        for command in commands
+        if command[2] == "create"
+    )
 
 
 def test_skips_existing_assignments(monkeypatch: pytest.MonkeyPatch) -> None:

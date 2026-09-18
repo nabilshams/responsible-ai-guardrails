@@ -20,7 +20,6 @@ def complete_environment(*, use_vnet: bool) -> dict[str, str]:
         values[f"AGENT_{service}_PROJECT_ENDPOINT"] = (
             "https://synthetic.example.test/project"
         )
-        values[f"AGENT_{service}_VERSION"] = "1"
         values[f"AGENT_{service}_INVOCATIONS_ENDPOINT"] = (
             "https://synthetic.example.test/invocations"
         )
@@ -29,6 +28,7 @@ def complete_environment(*, use_vnet: bool) -> dict[str, str]:
             VNET_ID="synthetic-vnet-id",
             AGENT_SUBNET_ID="synthetic-agent-subnet-id",
             PE_SUBNET_ID="synthetic-private-endpoint-subnet-id",
+            WEB_SUBNET_ID="synthetic-web-subnet-id",
         )
     return values
 
@@ -44,6 +44,13 @@ def test_complete_private_environment_requires_network_resource_ids() -> None:
     assert find_missing_variables(values) == ["AGENT_SUBNET_ID"]
 
 
+def test_private_environment_requires_web_subnet_id() -> None:
+    values = complete_environment(use_vnet=True)
+    values["WEB_SUBNET_ID"] = ""
+
+    assert find_missing_variables(values) == ["WEB_SUBNET_ID"]
+
+
 def test_reports_missing_agent_deploy_output_by_name_only() -> None:
     values = complete_environment(use_vnet=False)
     values.pop("AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT")
@@ -51,3 +58,10 @@ def test_reports_missing_agent_deploy_output_by_name_only() -> None:
     assert find_missing_variables(values) == [
         "AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT"
     ]
+
+
+def test_agent_version_metadata_is_optional() -> None:
+    values = complete_environment(use_vnet=False)
+    values["AGENT_PII_REDACTION_AGENT_VERSION"] = ""
+
+    assert find_missing_variables(values) == []

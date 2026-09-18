@@ -111,4 +111,5 @@ infra:
 hooks:
   postup:
     - run: scripts/configure_agent_rbac.py
+    - run: scripts/deploy_redaction_chat.py
     - run: scripts/validate_azd_environment.py

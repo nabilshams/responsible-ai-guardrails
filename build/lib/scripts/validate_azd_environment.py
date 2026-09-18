@@ -14,6 +14,7 @@ _REQUIRED_VARIABLES = (
     "VNET_ADDRESS_PREFIX",
     "AGENT_SUBNET_PREFIX",
     "PE_SUBNET_PREFIX",
+    "WEB_SUBNET_PREFIX",
     "AI_LANGUAGE_SKU",
     "DOCUMENT_INTELLIGENCE_SKU",
     "FOUNDRY_PROJECT_ENDPOINT",
@@ -34,6 +35,10 @@ _REQUIRED_VARIABLES = (
     "AZURE_CONTAINER_REGISTRY_RESOURCE_ID",
     "AZURE_CONTAINER_REGISTRY_ENDPOINT",
     "AZURE_CONTAINER_REGISTRY_NAME",
+    "AZURE_CONTAINER_APPS_ENVIRONMENT_NAME",
+    "AZURE_REDACTION_CHAT_NAME",
+    "AZURE_REDACTION_CHAT_PRINCIPAL_ID",
+    "AZURE_REDACTION_CHAT_URL",
     "APPLICATIONINSIGHTS_CONNECTION_STRING",
     "AZURE_LOG_ANALYTICS_WORKSPACE_ID",
     "AZURE_RESOURCE_GROUP",
@@ -60,14 +65,13 @@ def find_missing_variables(values: Mapping[str, str]) -> list[str]:
                 f"AGENT_{service}_INSTANCE_IDENTITY_PRINCIPAL_ID",
                 f"AGENT_{service}_NAME",
                 f"AGENT_{service}_PROJECT_ENDPOINT",
-                f"AGENT_{service}_VERSION",
                 f"AGENT_{service}_INVOCATIONS_ENDPOINT",
             )
         )
 
     use_vnet = values.get("USE_VNET", "").strip().lower() == "true"
     if use_vnet:
-        required.extend(("VNET_ID", "AGENT_SUBNET_ID", "PE_SUBNET_ID"))
+        required.extend(("VNET_ID", "AGENT_SUBNET_ID", "PE_SUBNET_ID", "WEB_SUBNET_ID"))
 
     return sorted(name for name in required if not values.get(name, "").strip())
 
