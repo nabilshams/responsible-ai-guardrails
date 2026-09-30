@@ -241,21 +241,72 @@
     }
     .samples:empty { display: none; }
     .samples-label { color: var(--cp-text-muted); font-size: 11px; font-weight: 600; margin-right: 2px; }
+    .sample-actions {
+      display: inline-flex;
+      align-items: center;
+      overflow: hidden;
+      border: 1px solid var(--cp-border);
+      border-radius: 999px;
+      background: var(--cp-surface);
+    }
     .sample-chip {
       display: inline-flex;
       align-items: center;
       gap: 6px;
       height: 28px;
       padding: 0 10px;
-      border: 1px solid var(--cp-border);
-      border-radius: 999px;
-      background: var(--cp-surface);
+      border: 0;
+      background: transparent;
       color: var(--cp-text);
       font-size: 11px;
     }
-    .sample-chip:hover { background: var(--cp-surface-soft); border-color: var(--cp-accent); }
+    .sample-actions:hover { border-color: var(--cp-accent); }
+    .sample-chip:hover, .sample-action:hover { background: var(--cp-surface-soft); }
     .sample-chip:disabled { opacity: .55; cursor: not-allowed; }
     .sample-chip svg { width: 14px; height: 14px; }
+    .sample-action {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: 0;
+      border-left: 1px solid var(--cp-border);
+      background: transparent;
+      color: var(--cp-text-muted);
+    }
+    .sample-action svg { width: 13px; height: 13px; }
+    .sample-preview {
+      width: min(900px, calc(100vw - 32px));
+      height: min(760px, calc(100vh - 32px));
+      padding: 0;
+      border: 1px solid var(--cp-border-strong);
+      border-radius: 10px;
+      background: var(--cp-surface);
+      color: var(--cp-text);
+      box-shadow: var(--cp-shadow);
+    }
+    .sample-preview::backdrop { background: rgba(0, 0, 0, .55); }
+    .preview-layout { height: 100%; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; }
+    .preview-heading, .preview-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+    }
+    .preview-heading { border-bottom: 1px solid var(--cp-border); }
+    .preview-heading h2 { margin: 0; font-size: 15px; }
+    .preview-notice {
+      margin: 0;
+      padding: 9px 14px;
+      background: var(--cp-accent-soft);
+      color: var(--cp-text-muted);
+      font-size: 11px;
+    }
+    .preview-frame { width: 100%; height: 100%; border: 0; background: var(--cp-surface-soft); }
+    .preview-actions { justify-content: flex-end; border-top: 1px solid var(--cp-border); }
+    .preview-actions a { text-decoration: none; }
     .composer {
       width: min(760px, 100%);
       margin: 0 auto;
@@ -440,6 +491,27 @@
     </div>
   </main>
 
+  <dialog class="sample-preview" id="sample-preview" aria-labelledby="preview-title">
+    <div class="preview-layout">
+      <header class="preview-heading">
+        <h2 id="preview-title">Sample document</h2>
+        <button class="icon-button" id="close-preview" type="button" title="Close preview" aria-label="Close preview">
+          <i data-lucide="x"></i>
+        </button>
+      </header>
+      <p class="preview-notice">Synthetic test data only &mdash; this document does not describe a real person.</p>
+      <iframe class="preview-frame" id="preview-frame" title="Sample document preview"></iframe>
+      <footer class="preview-actions">
+        <a class="download-button" id="download-sample" href="#" download>
+          <i data-lucide="download"></i><span>Download sample</span>
+        </a>
+        <button class="primary-button" id="use-preview-sample" type="button" aria-label="Use this sample">
+          <i data-lucide="paperclip"></i><span>Use this sample</span>
+        </button>
+      </footer>
+    </div>
+  </dialog>
+
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <script>
     const allowedExtensions = new Set(["txt", "csv", "json", "xml", "md", "log", "docx", "pdf", "png", "jpg", "jpeg"]);
@@ -450,16 +522,22 @@
       attachments: document.querySelector("#attachments"),
       attach: document.querySelector("#attach"),
       clear: document.querySelector("#clear"),
+      closePreview: document.querySelector("#close-preview"),
       composer: document.querySelector("#composer"),
+      downloadSample: document.querySelector("#download-sample"),
       empty: document.querySelector("#empty"),
       fileInput: document.querySelector("#file-input"),
       language: document.querySelector("#language"),
       message: document.querySelector("#message"),
       messages: document.querySelector("#messages"),
+      preview: document.querySelector("#sample-preview"),
+      previewFrame: document.querySelector("#preview-frame"),
+      previewTitle: document.querySelector("#preview-title"),
       queueStatus: document.querySelector("#queue-status"),
       send: document.querySelector("#send"),
       status: document.querySelector("#status"),
-      samples: document.querySelector("#samples")
+      samples: document.querySelector("#samples"),
+      usePreviewSample: document.querySelector("#use-preview-sample")
     };
 
     lucide.createIcons();
@@ -489,13 +567,36 @@
         label.textContent = "Try a sample:";
         elements.samples.append(label);
         for (const sample of samples) {
+          const actions = document.createElement("span");
+          actions.className = "sample-actions";
           const chip = document.createElement("button");
           chip.type = "button";
           chip.className = "sample-chip";
+          chip.title = sample.kind === "text" ? "Use sample text" : "Use sample file";
           chip.innerHTML = `<i data-lucide="${sample.kind === "text" ? "type" : "file-text"}"></i><span></span>`;
           chip.querySelector("span").textContent = sample.label;
           chip.addEventListener("click", () => useSample(sample, chip));
-          elements.samples.append(chip);
+          actions.append(chip);
+          if (sample.previewable) {
+            const preview = document.createElement("button");
+            preview.type = "button";
+            preview.className = "sample-action";
+            preview.title = `Preview ${sample.label}`;
+            preview.setAttribute("aria-label", `Preview ${sample.label}`);
+            preview.innerHTML = `<i data-lucide="eye"></i>`;
+            preview.addEventListener("click", () => openSamplePreview(sample));
+            actions.append(preview);
+
+            const download = document.createElement("a");
+            download.className = "sample-action";
+            download.href = sampleUrl(sample);
+            download.download = sample.filename;
+            download.title = `Download ${sample.label}`;
+            download.setAttribute("aria-label", `Download ${sample.label}`);
+            download.innerHTML = `<i data-lucide="download"></i>`;
+            actions.append(download);
+          }
+          elements.samples.append(actions);
         }
         lucide.createIcons();
       } catch {
@@ -512,7 +613,7 @@
       }
       chip.disabled = true;
       try {
-        const response = await fetch(`/api/samples/${encodeURIComponent(sample.id)}`, { cache: "no-store" });
+        const response = await fetch(sampleUrl(sample), { cache: "no-store" });
         if (!response.ok) throw new Error();
         const blob = await response.blob();
         const file = new File([blob], sample.filename, { type: blob.type || "application/octet-stream" });
@@ -522,6 +623,28 @@
       } finally {
         chip.disabled = false;
       }
+    }
+
+    function sampleUrl(sample) {
+      return `/api/samples/${encodeURIComponent(sample.id)}`;
+    }
+
+    function openSamplePreview(sample) {
+      elements.previewTitle.textContent = sample.label;
+      elements.previewFrame.src = sampleUrl(sample);
+      elements.downloadSample.href = sampleUrl(sample);
+      elements.downloadSample.download = sample.filename;
+      elements.usePreviewSample.onclick = async () => {
+        await useSample(sample, elements.usePreviewSample);
+        closeSamplePreview();
+      };
+      elements.preview.showModal();
+    }
+
+    function closeSamplePreview() {
+      elements.preview.close();
+      elements.previewFrame.removeAttribute("src");
+      elements.usePreviewSample.onclick = null;
     }
 
     function extension(name) {
@@ -689,6 +812,14 @@
     }
 
     elements.attach.addEventListener("click", () => elements.fileInput.click());
+    elements.closePreview.addEventListener("click", closeSamplePreview);
+    elements.preview.addEventListener("click", (event) => {
+      if (event.target === elements.preview) closeSamplePreview();
+    });
+    elements.preview.addEventListener("close", () => {
+      elements.previewFrame.removeAttribute("src");
+      elements.usePreviewSample.onclick = null;
+    });
     elements.fileInput.addEventListener("change", () => {
       addFiles(elements.fileInput.files);
       elements.fileInput.value = "";

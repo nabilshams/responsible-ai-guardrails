@@ -321,13 +321,14 @@ def create_app(service: RedactionChatService | None = None) -> FastAPI:
 
     @application.get("/api/samples", include_in_schema=False)
     def list_samples() -> JSONResponse:
-        items: list[dict[str, str]] = []
+        items: list[dict[str, str | bool]] = []
         for sample in _SAMPLES:
-            entry = {
+            entry: dict[str, str | bool] = {
                 "id": sample["id"],
                 "label": sample["label"],
                 "kind": sample["kind"],
                 "filename": sample["filename"],
+                "previewable": sample["media_type"] == "application/pdf",
             }
             if sample["kind"] == "text":
                 try:
@@ -348,7 +349,10 @@ def create_app(service: RedactionChatService | None = None) -> FastAPI:
         if not path.is_file():
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
         return FileResponse(
-            path, media_type=sample["media_type"], filename=sample["filename"]
+            path,
+            media_type=sample["media_type"],
+            filename=sample["filename"],
+            content_disposition_type="inline",
         )
 
     @application.post("/api/redact", response_model=RedactionChatResponse)

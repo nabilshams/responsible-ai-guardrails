@@ -111,6 +111,8 @@ def test_serves_chat_interface() -> None:
 
     assert response.status_code == 200
     assert 'id="composer"' in response.text
+    assert 'id="sample-preview"' in response.text
+    assert "Use this sample" in response.text
     assert 'fetch("/api/redact"' in response.text
 
 
@@ -140,6 +142,9 @@ def test_lists_ready_to_use_samples() -> None:
     text_sample = next(sample for sample in samples if sample["id"] == "text")
     assert text_sample["kind"] == "text"
     assert text_sample["text"].strip()
+    assert text_sample["previewable"] is False
+    pdf_sample = next(sample for sample in samples if sample["id"] == "pdf")
+    assert pdf_sample["previewable"] is True
 
 
 def test_serves_a_named_sample_file() -> None:
@@ -149,6 +154,7 @@ def test_serves_a_named_sample_file() -> None:
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/pdf"
+    assert response.headers["content-disposition"].startswith("inline;")
     assert response.content
 
 
