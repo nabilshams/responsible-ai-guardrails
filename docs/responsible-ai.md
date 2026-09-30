@@ -16,4 +16,7 @@
 
 ## Human oversight
 
-Route low-confidence, high-impact, regulated, or failed analysis cases to the planned Human Review Agent. Reviewers should see the minimum content required, have time-limited access, and never copy sensitive values into comments.
+Route low-confidence, high-impact, regulated, or failed analysis cases to a
+Microsoft-native approval workflow using Power Automate Approvals, Dataverse,
+Teams, and Microsoft Entra ID. Reviewers should see the minimum content required,
+have time-limited access, and never copy sensitive values into comments.
