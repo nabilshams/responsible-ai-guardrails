@@ -273,11 +273,44 @@ class NativeDocumentPiiRedactor:
             if status == "succeeded":
                 return payload
             if status in {"failed", "cancelled", "canceled"}:
-                raise RuntimeError("Azure AI Language document job did not succeed")
+                raise RuntimeError(
+                    "Azure AI Language document job did not succeed: "
+                    + self._job_failure_reason(payload)
+                )
             if status not in {"running", "notstarted", "not_started"}:
                 raise RuntimeError("Azure AI Language returned an unknown document job status")
             self._sleep(self.settings.document_pii_poll_interval_seconds)
         raise RuntimeError("Azure AI Language document job timed out")
+
+    @staticmethod
+    def _job_failure_reason(payload: dict[str, Any]) -> str:
+        """Collect service error codes and messages from a failed document job."""
+        reasons: list[str] = []
+
+        def collect(errors: Any) -> None:
+            if not isinstance(errors, list):
+                return
+            for entry in errors:
+                if not isinstance(entry, dict):
+                    continue
+                error = entry.get("error") if isinstance(entry.get("error"), dict) else entry
+                code = str(error.get("code", "")).strip()
+                message = str(error.get("message", "")).strip()
+                if code and message:
+                    reasons.append(f"{code}: {message}")
+                elif code or message:
+                    reasons.append(code or message)
+
+        collect(payload.get("errors"))
+        for task in payload.get("tasks", {}).get("items", []):
+            if not isinstance(task, dict):
+                continue
+            if isinstance(task.get("error"), dict):
+                collect([task["error"]])
+            results = task.get("results")
+            if isinstance(results, dict):
+                collect(results.get("errors"))
+        return "; ".join(reasons[:5]) or "unknown error"
 
     @staticmethod
     def validate_operation_location(operation_location: str, endpoint: str) -> None:

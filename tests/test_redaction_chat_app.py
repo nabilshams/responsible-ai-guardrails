@@ -126,3 +126,35 @@ def test_validation_error_does_not_echo_rejected_source_content() -> None:
     assert response.status_code == 422
     assert response.json() == {"detail": "The request format is invalid"}
     assert source not in response.text
+
+
+def test_lists_ready_to_use_samples() -> None:
+    client = TestClient(create_app(RedactionChatService(lambda _: StubClient({}))))
+
+    response = client.get("/api/samples")
+
+    assert response.status_code == 200
+    samples = response.json()
+    ids = {sample["id"] for sample in samples}
+    assert {"text", "txt", "csv", "json", "docx", "pdf"} <= ids
+    text_sample = next(sample for sample in samples if sample["id"] == "text")
+    assert text_sample["kind"] == "text"
+    assert text_sample["text"].strip()
+
+
+def test_serves_a_named_sample_file() -> None:
+    client = TestClient(create_app(RedactionChatService(lambda _: StubClient({}))))
+
+    response = client.get("/api/samples/pdf")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.content
+
+
+def test_rejects_unknown_sample() -> None:
+    client = TestClient(create_app(RedactionChatService(lambda _: StubClient({}))))
+
+    response = client.get("/api/samples/does-not-exist")
+
+    assert response.status_code == 404

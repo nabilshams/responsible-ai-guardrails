@@ -90,8 +90,6 @@ def _assert_native_document_redacted(
     assert redacted
     assert redacted != source.content
     assert result.get("content_type") == source.content_type
-    if source.filename.endswith(".txt"):
-        assert _SYNTHETIC_EMAIL.encode() not in redacted.lower()
     if source.filename.endswith(".pdf"):
         source_pdf = PdfReader(io.BytesIO(source.content), strict=True)
         redacted_pdf = PdfReader(io.BytesIO(redacted), strict=True)
@@ -224,7 +222,7 @@ async def test_live_document_agent_redacts_each_supported_document(
     result = await client.invoke(
         _document_payload(document),
     )
-    if document.filename.endswith((".txt", ".pdf", ".docx")):
+    if document.filename.endswith((".pdf", ".docx")):
         _assert_native_document_redacted(result, document)
     else:
         _assert_email_redacted(result)

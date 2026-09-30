@@ -16,7 +16,7 @@
 .coverage
 htmlcov
 infra
-samples
+samples/output
 test-results
 tests
 validation_output.txt

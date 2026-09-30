@@ -19,7 +19,8 @@ from .service import PiiRedactionService
 
 logger = logging.getLogger(__name__)
 
-_NATIVE_DOCUMENT_SUFFIXES = {".txt", ".pdf", ".docx"}
+# Plain .txt uses the text path; the native document API only handles .pdf and .docx.
+_NATIVE_DOCUMENT_SUFFIXES = {".pdf", ".docx"}
 
 
 @dataclass(frozen=True, slots=True)

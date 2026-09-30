@@ -44,6 +44,55 @@ _IMAGE_TYPES = {
     ".jpeg": "image/jpeg",
 }
 
+_SAMPLES_ROOT = Path(__file__).resolve().parents[1] / "samples" / "input"
+_SAMPLES: tuple[dict[str, str], ...] = (
+    {
+        "id": "text",
+        "label": "PII text",
+        "kind": "text",
+        "filename": "synthetic-contact.txt",
+        "media_type": "text/plain",
+    },
+    {
+        "id": "txt",
+        "label": "Contact · TXT",
+        "kind": "file",
+        "filename": "synthetic-contact.txt",
+        "media_type": "text/plain",
+    },
+    {
+        "id": "csv",
+        "label": "Contacts · CSV",
+        "kind": "file",
+        "filename": "synthetic-contacts.csv",
+        "media_type": "text/csv",
+    },
+    {
+        "id": "json",
+        "label": "Profile · JSON",
+        "kind": "file",
+        "filename": "synthetic-profile.json",
+        "media_type": "application/json",
+    },
+    {
+        "id": "docx",
+        "label": "Record · DOCX",
+        "kind": "file",
+        "filename": "synthetic-pii-record.docx",
+        "media_type": (
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ),
+    },
+    {
+        "id": "pdf",
+        "label": "Form · PDF",
+        "kind": "file",
+        "filename": "synthetic-pii-form.pdf",
+        "media_type": "application/pdf",
+    },
+)
+_SAMPLES_BY_ID = {sample["id"]: sample for sample in _SAMPLES}
+
 
 class AgentClient(Protocol):
     async def invoke(self, payload: dict[str, Any]) -> dict[str, Any]: ...
@@ -269,6 +318,38 @@ def create_app(service: RedactionChatService | None = None) -> FastAPI:
     @application.get("/healthz", include_in_schema=False)
     def health() -> dict[str, str]:
         return {"status": "healthy"}
+
+    @application.get("/api/samples", include_in_schema=False)
+    def list_samples() -> JSONResponse:
+        items: list[dict[str, str]] = []
+        for sample in _SAMPLES:
+            entry = {
+                "id": sample["id"],
+                "label": sample["label"],
+                "kind": sample["kind"],
+                "filename": sample["filename"],
+            }
+            if sample["kind"] == "text":
+                try:
+                    entry["text"] = (_SAMPLES_ROOT / sample["filename"]).read_text(
+                        encoding="utf-8"
+                    )
+                except OSError:
+                    continue
+            items.append(entry)
+        return JSONResponse(content=items)
+
+    @application.get("/api/samples/{sample_id}", include_in_schema=False)
+    def get_sample(sample_id: str) -> FileResponse:
+        sample = _SAMPLES_BY_ID.get(sample_id)
+        if sample is None or sample["kind"] != "file":
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown sample")
+        path = _SAMPLES_ROOT / sample["filename"]
+        if not path.is_file():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
+        return FileResponse(
+            path, media_type=sample["media_type"], filename=sample["filename"]
+        )
 
     @application.post("/api/redact", response_model=RedactionChatResponse)
     async def redact(request: RedactionChatRequest) -> RedactionChatResponse:

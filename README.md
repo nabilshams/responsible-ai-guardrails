@@ -9,11 +9,11 @@ This repository is an accelerator, not a guarantee that every sensitive value wi
 | Input | Redaction path | Output |
 | --- | --- | --- |
 | Text, prompts, and responses | Azure AI Language text PII | Redacted text plus category counts |
-| `.txt`, `.pdf`, `.docx` | Azure AI Language Document-based PII | Redacted native document |
-| `.csv`, `.json`, `.xml`, `.md`, `.log` | Azure AI Language text PII | Redacted UTF-8 text |
+| `.pdf`, `.docx` | Azure AI Language Document-based PII | Redacted native document |
+| `.txt`, `.csv`, `.json`, `.xml`, `.md`, `.log` | Azure AI Language text PII | Redacted UTF-8 text |
 | Images | Document Intelligence OCR geometry and Azure AI Language PII | Redacted PNG |
 
-Native document redaction uploads each PDF, DOCX, or TXT file to private temporary Blob Storage, submits an asynchronous Azure AI Language job, retrieves the redacted native artifact, and attempts to delete temporary artifacts. A storage lifecycle rule provides fallback cleanup.
+Native document redaction uploads each PDF or DOCX file to private temporary Blob Storage, submits an asynchronous Azure AI Language job, retrieves the redacted native artifact, and attempts to delete temporary artifacts. A storage lifecycle rule provides fallback cleanup.
 
 ## Architecture At A Glance
 
@@ -205,8 +205,8 @@ Do not paste the endpoint into source files, scripts, issue comments, or logs.
 - Supported extensions are `.txt`, `.csv`, `.json`, `.xml`, `.md`, `.log`, `.docx`, and `.pdf`.
 - The selected file must be directly inside the input folder.
 - Existing outputs are protected unless `--overwrite` is supplied.
-- The executor validates returned native PDF, DOCX, and TXT artifacts before replacing an output. A failed call or invalid native artifact leaves any existing output unchanged.
-- Native source and output formats are preserved for `.txt`, `.pdf`, and `.docx`. Structured files are saved as redacted UTF-8 text.
+- The executor validates returned native PDF and DOCX artifacts before replacing an output. A failed call or invalid native artifact leaves any existing output unchanged.
+- Native source and output formats are preserved for `.pdf` and `.docx`. Plain-text and structured files (`.txt`, `.csv`, `.json`, `.xml`, `.md`, `.log`) are saved as redacted UTF-8 text.
 
 ### Direct HTTP Debug Runner
 
