@@ -81,6 +81,19 @@ def _assert_email_redacted(result: dict[str, object]) -> None:
     assert sum(value for value in entity_counts.values() if isinstance(value, int)) >= 1
 
 
+def _assert_email_and_secret_redacted(result: dict[str, object]) -> None:
+    _assert_email_redacted(result)
+    redacted_text = result.get("redacted_text")
+    assert isinstance(redacted_text, str)
+    assert _SYNTHETIC_CREDENTIAL not in redacted_text
+    assert "[REDACTED:GENERICSECRET]" in redacted_text
+
+    entity_counts = result.get("entity_counts")
+    assert isinstance(entity_counts, dict)
+    assert entity_counts.get("Email") == 1
+    assert entity_counts.get("GenericSecret") == 1
+
+
 def _assert_native_document_redacted(
     result: dict[str, object],
     source: SyntheticDocument,
@@ -177,7 +190,10 @@ async def test_live_secret_agent_redacts_synthetic_runtime_secret(
             SyntheticDocument(
                 "synthetic.txt",
                 "text/plain",
-                f"Synthetic email: {_SYNTHETIC_EMAIL}".encode(),
+                (
+                    f"Synthetic email: {_SYNTHETIC_EMAIL}\n"
+                    f"client_secret={_SYNTHETIC_CREDENTIAL}"
+                ).encode(),
             ),
             id="txt",
         ),
@@ -185,7 +201,11 @@ async def test_live_secret_agent_redacts_synthetic_runtime_secret(
             SyntheticDocument(
                 "synthetic.csv",
                 "text/csv",
-                f"kind,value\nsynthetic-email,{_SYNTHETIC_EMAIL}\n".encode(),
+                (
+                    "kind,value\n"
+                    f"synthetic-email,{_SYNTHETIC_EMAIL}\n"
+                    f"synthetic-configuration,client_secret={_SYNTHETIC_CREDENTIAL}\n"
+                ).encode(),
             ),
             id="csv",
         ),
@@ -193,7 +213,13 @@ async def test_live_secret_agent_redacts_synthetic_runtime_secret(
             SyntheticDocument(
                 "synthetic.json",
                 "application/json",
-                ('{"kind":"synthetic-email","value":"' + _SYNTHETIC_EMAIL + '"}').encode(),
+                (
+                    '{"email":"'
+                    + _SYNTHETIC_EMAIL
+                    + '","client_secret":"'
+                    + _SYNTHETIC_CREDENTIAL
+                    + '"}'
+                ).encode(),
             ),
             id="json",
         ),
@@ -201,7 +227,10 @@ async def test_live_secret_agent_redacts_synthetic_runtime_secret(
             SyntheticDocument(
                 "synthetic.xml",
                 "application/xml",
-                f"<synthetic><email>{_SYNTHETIC_EMAIL}</email></synthetic>".encode(),
+                (
+                    f'<synthetic client_secret="{_SYNTHETIC_CREDENTIAL}">'
+                    f"<email>{_SYNTHETIC_EMAIL}</email></synthetic>"
+                ).encode(),
             ),
             id="xml",
         ),
@@ -209,7 +238,10 @@ async def test_live_secret_agent_redacts_synthetic_runtime_secret(
             SyntheticDocument(
                 "synthetic.md",
                 "text/markdown",
-                f"# Synthetic contact\n\nEmail: {_SYNTHETIC_EMAIL}\n".encode(),
+                (
+                    f"# Synthetic contact\n\nEmail: {_SYNTHETIC_EMAIL}\n"
+                    f"client_secret={_SYNTHETIC_CREDENTIAL}\n"
+                ).encode(),
             ),
             id="markdown",
         ),
@@ -217,7 +249,10 @@ async def test_live_secret_agent_redacts_synthetic_runtime_secret(
             SyntheticDocument(
                 "synthetic.log",
                 "application/octet-stream",
-                f"level=info synthetic_email={_SYNTHETIC_EMAIL}\n".encode(),
+                (
+                    f"level=info synthetic_email={_SYNTHETIC_EMAIL} "
+                    f"client_secret={_SYNTHETIC_CREDENTIAL}\n"
+                ).encode(),
             ),
             id="log",
         ),
@@ -253,7 +288,7 @@ async def test_live_document_agent_redacts_each_supported_document(
     if document.filename.endswith((".pdf", ".docx")):
         _assert_native_document_redacted(result, document)
     else:
-        _assert_email_redacted(result)
+        _assert_email_and_secret_redacted(result)
 
 
 @pytest.mark.asyncio

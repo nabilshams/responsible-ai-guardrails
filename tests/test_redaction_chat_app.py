@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import base64
-from io import BytesIO
+import csv
+import json
+from io import BytesIO, StringIO
 from typing import Any
 
 import pytest
@@ -208,6 +210,39 @@ def test_serves_a_named_sample_file() -> None:
     assert response.headers["content-type"] == "application/pdf"
     assert response.headers["content-disposition"].startswith("inline;")
     assert response.content
+
+
+@pytest.mark.parametrize(
+    ("sample_id", "expected_secret"),
+    [
+        ("txt", "synthetic_txt_secret_Q7v9X2m4"),
+        ("csv", "synthetic_csv_secret_Z8w1N5p3"),
+        ("json", "synthetic_json_secret_K4m8R2v6"),
+    ],
+)
+def test_structured_web_samples_contain_synthetic_pii_and_secrets(
+    sample_id: str,
+    expected_secret: str,
+) -> None:
+    client = TestClient(create_app(RedactionChatService(lambda _: StubClient({}))))
+
+    response = client.get(f"/api/samples/{sample_id}")
+
+    assert response.status_code == 200
+    text = response.content.decode("utf-8")
+    assert "SYNTHETIC" in text
+    assert "NON-FUNCTIONAL" in text
+    assert "example.test" in text
+    assert expected_secret in text
+    detections = SecretDetector().detect(text)
+    assert any(
+        entity.category == "GenericSecret" and entity.value == expected_secret
+        for entity in detections
+    )
+    if sample_id == "csv":
+        assert len(list(csv.reader(StringIO(text)))) == 3
+    elif sample_id == "json":
+        assert json.loads(text)["configuration"]["client_secret"] == expected_secret
 
 
 def test_rejects_unknown_sample() -> None:

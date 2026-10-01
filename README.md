@@ -1,6 +1,6 @@
 # Responsible AI Guardrails
 
-PII and runtime secret redaction for text and native documents, exposed through independently deployable Microsoft Foundry hosted agents.
+PII and runtime secret redaction for text and structured documents, plus native-document PII redaction, exposed through independently deployable Microsoft Foundry hosted agents.
 
 This repository is an accelerator, not a guarantee that every sensitive value will be detected. Validate detection categories, supported languages, accuracy, and retention against the policies that apply to your organization before processing production data.
 
@@ -10,7 +10,7 @@ This repository is an accelerator, not a guarantee that every sensitive value wi
 | --- | --- | --- |
 | Text, prompts, and responses | Azure AI Language text PII followed by deterministic secret detection | Redacted text plus category counts |
 | `.pdf`, `.docx` | Azure AI Language Document-based PII | Redacted native document |
-| `.txt`, `.csv`, `.json`, `.xml`, `.md`, `.log` | Azure AI Language text PII | Redacted UTF-8 text |
+| `.txt`, `.csv`, `.json`, `.xml`, `.md`, `.log` | Azure AI Language text PII combined with deterministic secret detection | Redacted UTF-8 text plus category counts |
 | Images | Document Intelligence OCR geometry and Azure AI Language PII | Redacted PNG |
 
 Native document redaction uploads each PDF or DOCX file to private temporary Blob Storage, submits an asynchronous Azure AI Language job, retrieves the redacted native artifact, and attempts to delete temporary artifacts. A storage lifecycle rule provides fallback cleanup.
@@ -33,7 +33,7 @@ docs/                           Architecture, security, evaluation, and deployme
 
 ## Security Model
 
-- Azure AI Language detects PII. Runtime secret signatures and entropy checks execute locally. Neither path sends content to a generative model.
+- Azure AI Language detects PII. Runtime secret signatures and entropy checks execute locally for direct text and structured text files. Neither path sends content to a generative model.
 - Authentication uses `DefaultAzureCredential`; do not add Azure service keys, connection strings, SAS tokens, or production PII to source control.
 - Keep source files and generated outputs outside Git. Supplied sample files are visibly synthetic only.
 - The deployed Document Redaction Agent returns native document bytes as base64 over the Invocations protocol. The executor decodes them and writes the result to disk.
@@ -207,7 +207,7 @@ Do not paste the endpoint into source files, scripts, issue comments, or logs.
 - The selected file must be directly inside the input folder.
 - Existing outputs are protected unless `--overwrite` is supplied.
 - The executor validates returned native PDF and DOCX artifacts before replacing an output. A failed call or invalid native artifact leaves any existing output unchanged.
-- Native source and output formats are preserved for `.pdf` and `.docx`. Plain-text and structured files (`.txt`, `.csv`, `.json`, `.xml`, `.md`, `.log`) are saved as redacted UTF-8 text.
+- Native source and output formats are preserved for `.pdf` and `.docx`. Plain-text and structured files (`.txt`, `.csv`, `.json`, `.xml`, `.md`, `.log`) are saved as UTF-8 text after combined PII and secret redaction.
 
 ### Direct HTTP Debug Runner
 

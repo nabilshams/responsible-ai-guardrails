@@ -70,7 +70,7 @@ services:
     kind: hosted
     name: document-redaction-agent
     displayName: Document Redaction Agent
-    description: Redacts native documents with Azure AI Language document-based PII while preserving layout.
+    description: Redacts PII and secrets in structured text files and preserves native PDF and DOCX layout for PII.
     project: ../..
     language: docker
     docker:

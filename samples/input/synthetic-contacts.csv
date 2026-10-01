@@ -1,3 +1,3 @@
-record_type,name,email,phone,address
-synthetic,Synthetic Person Alpha,synthetic.alpha@example.test,+1-202-555-0100,"123 Example Avenue, Testville, ZZ 00000"
-synthetic,Synthetic Person Beta,synthetic.beta@example.test,+1-202-555-0101,"456 Sample Street, Mock City, ZZ 00000"
+fixture_notice,record_type,name,email,phone,address,configuration
+SYNTHETIC NON-FUNCTIONAL TEST DATA,synthetic,Synthetic Person Alpha,synthetic.alpha@example.test,+1-202-555-0100,"123 Example Avenue, Testville, ZZ 00000",client_secret=synthetic_csv_secret_Z8w1N5p3
+SYNTHETIC NON-FUNCTIONAL TEST DATA,synthetic,Synthetic Person Beta,synthetic.beta@example.test,+1-202-555-0101,"456 Sample Street, Mock City, ZZ 00000",not_applicable

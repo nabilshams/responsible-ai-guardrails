@@ -1,5 +1,6 @@
 {
-  "fixture_notice": "SYNTHETIC TEST DATA — NOT A REAL PERSON",
+  "fixture_notice": "SYNTHETIC TEST DATA - NOT A REAL PERSON",
+  "credential_notice": "NON-FUNCTIONAL SECRET EXAMPLE - CANNOT AUTHENTICATE",
   "profile": {
     "name": "Synthetic Person Gamma",
     "email": "synthetic.gamma@example.test",
@@ -7,5 +8,8 @@
     "address": "789 Fictional Road, Demo Town, ZZ 00000",
     "ip_address": "198.51.100.25"
   },
-  "purpose": "PII-redaction testing only"
+  "configuration": {
+    "client_secret": "synthetic_json_secret_K4m8R2v6"
+  },
+  "purpose": "PII and secret redaction testing only"
 }

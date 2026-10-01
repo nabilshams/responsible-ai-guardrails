@@ -3,8 +3,9 @@
 ## Trust boundaries
 
 1. The calling application authenticates to the hosted agent or API through Microsoft Entra ID and private networking.
-2. The workload uses managed identity to call Azure AI Language. Secret detection
-   executes locally and never validates a matched value with a provider.
+2. The workload uses managed identity to call Azure AI Language. Runtime and
+   structured-document secret detection executes locally and never validates a
+   matched value with a provider.
 3. Original source content stays inside the processing boundary. Native document PII uses short-lived private Blob artifacts that are deleted after processing, with a one-day lifecycle rule as cleanup defense in depth.
 4. Telemetry contains correlation ID, category names, counts, latency, and status only.
 

@@ -14,7 +14,8 @@ from .documents import DocumentExtractor
 from .images import ImageRedactor
 from .models import RedactionResult
 from .native_document_pii import NativeDocumentPiiRedactor, NativeDocumentRedactionResult
-from .redactor import normalize_entities
+from .redactor import normalize_entities, redact_text
+from .secrets import SecretDetector
 from .service import PiiRedactionService
 
 logger = logging.getLogger(__name__)
@@ -33,16 +34,21 @@ class ImageRedactionResult:
 
 
 class DocumentRedactionService:
-    """Extract document text and redact PII with Azure AI Language."""
+    """Extract structured text and redact PII and runtime secrets."""
 
     def __init__(
         self,
         settings: Settings | None = None,
         pii_service: PiiRedactionService | None = None,
         extractor: DocumentExtractor | None = None,
+        secret_detector: SecretDetector | None = None,
     ) -> None:
         self.settings = settings or Settings()
         self.pii_service = pii_service or PiiRedactionService(self.settings)
+        self.secret_detector = secret_detector or SecretDetector(
+            minimum_entropy=self.settings.secret_minimum_entropy,
+            additional_keywords=self.settings.secret_additional_keywords,
+        )
         credential = DefaultAzureCredential(exclude_interactive_browser_credential=True)
         self.extractor = extractor or DocumentExtractor(
             self.settings.azure_document_intelligence_endpoint,
@@ -63,11 +69,28 @@ class DocumentRedactionService:
         if content_type.startswith("image/"):
             raise ValueError("Use the Image Redaction Agent for image inputs")
         document = self.extractor.extract(content, content_type, filename)
-        return self.pii_service.redact(
-            document.text,
-            language=language,
-            correlation_id=correlation_id,
+        request_id = correlation_id or str(uuid.uuid4())
+        pii_entities = normalize_entities(
+            self.pii_service.detect(document.text, language),
+            len(document.text),
+            self.settings.pii_confidence_threshold,
         )
+        secret_entities = self.secret_detector.detect(document.text)
+        result = redact_text(
+            document.text,
+            (*pii_entities, *secret_entities),
+            threshold=0.0,
+            style=self.settings.pii_replacement_style,
+            correlation_id=request_id,
+        )
+        logger.info(
+            "Structured document redaction completed correlation_id=%s "
+            "entity_count=%d categories=%s",
+            request_id,
+            len(result.entities),
+            sorted(result.entity_counts),
+        )
+        return result
 
 
 class DocumentAgentService:

@@ -113,7 +113,7 @@ def _generic_pattern(keywords: Iterable[str]) -> re.Pattern[str]:
         raise ValueError("Secret keywords must contain only safe identifier characters")
     names = "|".join(re.escape(keyword) for keyword in unique)
     return re.compile(
-        rf"(?i:\b(?:{names})\b\s*[:=]\s*)"
+        rf"(?i:\b(?:{names})\b[\"']?\s*[:=]\s*)"
         rf"[\"']?(?P<value>[{_VALUE_CHARACTERS}]{{12,}})"
     )
 

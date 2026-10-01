@@ -74,6 +74,19 @@ def test_generic_detection_requires_context_entropy_and_minimum_length() -> None
     assert detector.detect("api_key=${SYNTHETIC_SECRET}") == []
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        '{"client_secret":"synthetic_client_secret_Q7v9X2m4"}',
+        '<credential client_secret="synthetic_client_secret_Q7v9X2m4" />',
+    ],
+)
+def test_generic_detection_supports_structured_assignments(text: str) -> None:
+    detections = SecretDetector().detect(text)
+
+    assert [item.category for item in detections] == ["GenericSecret"]
+
+
 def test_additional_keyword_is_literal_and_rejects_unsafe_patterns() -> None:
     detector = SecretDetector(additional_keywords=("contoso_credential",))
 

@@ -1,0 +1,11 @@
+SYNTHETIC MIXED TEST DATA - NOT A REAL PERSON
+NON-FUNCTIONAL SECRET EXAMPLE - CANNOT AUTHENTICATE
+
+Profile: Synthetic Person Alpha
+Email: synthetic.alpha@example.test
+Phone: +1-202-555-0100
+Address: 123 Example Avenue, Testville, ZZ 00000
+IP address: 192.0.2.10
+client_secret=synthetic_txt_secret_Q7v9X2m4
+
+Purpose: deterministic PII and secret redaction testing only.

@@ -1,4 +1,8 @@
-from io import BytesIO
+import csv
+import json
+import logging
+from io import BytesIO, StringIO
+from xml.etree import ElementTree
 
 import pytest
 from PIL import Image
@@ -28,6 +32,22 @@ class StubAzureLanguageDetector:
         ]
 
 
+class StubOverlappingPiiDetector:
+    def detect(self, text: str, language: str = "en") -> list[DetectedEntity]:
+        del language
+        value = "synthetic_client_secret_Q7v9X2m4"
+        return [
+            DetectedEntity(
+                "Organization",
+                text.index(value),
+                len(value),
+                0.75,
+                "azure-ai-language",
+                value,
+            )
+        ]
+
+
 class StubImageExtractor:
     def extract(self, content: bytes, content_type: str, filename: str) -> ExtractedDocument:
         del content, content_type, filename
@@ -45,19 +65,51 @@ def pii_service() -> PiiRedactionService:
 
 
 @pytest.mark.parametrize(
-    ("filename", "content_type"),
+    ("filename", "content_type", "content"),
     [
-        ("synthetic.txt", "text/plain"),
-        ("synthetic.csv", "text/csv"),
-        ("synthetic.json", "application/json"),
-        ("synthetic.xml", "application/xml"),
-        ("synthetic.md", "text/markdown"),
-        ("synthetic.log", "application/octet-stream"),
+        (
+            "synthetic.txt",
+            "text/plain",
+            "Contact synthetic.user@example.test\n"
+            "client_secret=synthetic_client_secret_Q7v9X2m4",
+        ),
+        (
+            "synthetic.csv",
+            "text/csv",
+            "email,configuration\nsynthetic.user@example.test,"
+            "client_secret=synthetic_client_secret_Q7v9X2m4\n",
+        ),
+        (
+            "synthetic.json",
+            "application/json",
+            '{"email":"synthetic.user@example.test","client_secret":'
+            '"synthetic_client_secret_Q7v9X2m4"}',
+        ),
+        (
+            "synthetic.xml",
+            "application/xml",
+            "<record><email>synthetic.user@example.test</email>"
+            '<credential client_secret="synthetic_client_secret_Q7v9X2m4" />'
+            "</record>",
+        ),
+        (
+            "synthetic.md",
+            "text/markdown",
+            "Email: synthetic.user@example.test\n"
+            "client_secret=synthetic_client_secret_Q7v9X2m4\n",
+        ),
+        (
+            "synthetic.log",
+            "application/octet-stream",
+            "email=synthetic.user@example.test "
+            "client_secret=synthetic_client_secret_Q7v9X2m4\n",
+        ),
     ],
 )
-def test_document_agent_extracts_and_redacts_supported_utf8_files(
+def test_document_agent_redacts_pii_and_secrets_in_supported_utf8_files(
     filename: str,
     content_type: str,
+    content: str,
 ) -> None:
     service = DocumentRedactionService(
         Settings(),
@@ -66,14 +118,71 @@ def test_document_agent_extracts_and_redacts_supported_utf8_files(
     )
 
     result = service.redact(
-        b"Contact synthetic.user@example.test",
+        content.encode(),
         content_type,
         filename,
         correlation_id="synthetic-document",
     )
 
-    assert result.redacted_text == "Contact [REDACTED:EMAIL]"
+    assert "synthetic.user@example.test" not in result.redacted_text
+    assert "synthetic_client_secret_Q7v9X2m4" not in result.redacted_text
+    assert "[REDACTED:EMAIL]" in result.redacted_text
+    assert "[REDACTED:GENERICSECRET]" in result.redacted_text
+    assert result.entity_counts == {"Email": 1, "GenericSecret": 1}
     assert result.correlation_id == "synthetic-document"
+    if filename.endswith(".csv"):
+        assert len(list(csv.reader(StringIO(result.redacted_text)))) == 2
+    elif filename.endswith(".json"):
+        assert "[REDACTED:GENERICSECRET]" in json.loads(
+            result.redacted_text
+        ).values()
+    elif filename.endswith(".xml"):
+        assert ElementTree.fromstring(  # noqa: S314 - bounded synthetic fixture.
+            result.redacted_text
+        ).tag == "record"
+
+
+def test_document_agent_prefers_secret_category_for_overlapping_detection() -> None:
+    service = DocumentRedactionService(
+        Settings(),
+        pii_service=PiiRedactionService(
+            Settings(),
+            detector=StubOverlappingPiiDetector(),
+        ),
+        extractor=DocumentExtractor(),
+    )
+
+    result = service.redact(
+        b"client_secret=synthetic_client_secret_Q7v9X2m4",
+        "text/plain",
+        "synthetic.txt",
+        correlation_id="synthetic-overlap",
+    )
+
+    assert result.redacted_text == "client_secret=[REDACTED:GENERICSECRET]"
+    assert result.entity_counts == {"GenericSecret": 1}
+
+
+def test_document_agent_logs_only_safe_combined_metadata(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    credential = "synthetic_client_secret_Q7v9X2m4"
+    service = DocumentRedactionService(
+        Settings(),
+        pii_service=pii_service(),
+        extractor=DocumentExtractor(),
+    )
+
+    with caplog.at_level(logging.INFO):
+        service.redact(
+            f"client_secret={credential}".encode(),
+            "text/plain",
+            "synthetic.txt",
+            correlation_id="synthetic-log",
+        )
+
+    assert credential not in caplog.text
+    assert "GenericSecret" in caplog.text
 
 
 def test_document_agent_rejects_image_inputs() -> None:
