@@ -175,7 +175,7 @@ def test_lists_ready_to_use_samples() -> None:
     assert response.status_code == 200
     samples = response.json()
     ids = {sample["id"] for sample in samples}
-    assert {"text", "secrets", "txt", "csv", "json", "docx", "pdf"} <= ids
+    assert {"text", "secrets", "txt", "csv", "json", "docx", "pdf", "png", "jpg"} <= ids
     text_sample = next(sample for sample in samples if sample["id"] == "text")
     assert text_sample["kind"] == "text"
     assert text_sample["text"].strip()
@@ -221,6 +221,8 @@ def test_serves_a_named_sample_file() -> None:
         ("json", "text/plain", '"credential_notice"'),
         ("docx", "text/plain", "SYNTHETIC"),
         ("pdf", "application/pdf", None),
+        ("png", "image/png", None),
+        ("jpg", "image/jpeg", None),
     ],
 )
 def test_previews_every_sample_file_format(
@@ -236,9 +238,32 @@ def test_previews_every_sample_file_format(
     assert response.headers["content-type"].startswith(content_type)
     if expected_text is None:
         assert response.headers["content-disposition"].startswith("inline;")
-        assert response.content.startswith(b"%PDF")
+        expected_signatures = {
+            "pdf": b"%PDF",
+            "png": b"\x89PNG",
+            "jpg": b"\xff\xd8\xff",
+        }
+        assert response.content.startswith(expected_signatures[sample_id])
     else:
         assert expected_text in response.text
+
+
+@pytest.mark.parametrize(
+    ("sample_id", "expected_format"),
+    [("png", "PNG"), ("jpg", "JPEG")],
+)
+def test_image_web_samples_are_valid_and_visibly_synthetic(
+    sample_id: str,
+    expected_format: str,
+) -> None:
+    client = TestClient(create_app(RedactionChatService(lambda _: StubClient({}))))
+
+    response = client.get(f"/api/samples/{sample_id}")
+
+    assert response.status_code == 200
+    with Image.open(BytesIO(response.content)) as image:
+        assert image.format == expected_format
+        assert image.size == (1600, 760)
 
 
 @pytest.mark.parametrize(

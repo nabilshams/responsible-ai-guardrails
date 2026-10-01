@@ -100,6 +100,20 @@ _SAMPLES: tuple[dict[str, str], ...] = (
         "filename": "synthetic-pii-form.pdf",
         "media_type": "application/pdf",
     },
+    {
+        "id": "png",
+        "label": "Contact · PNG",
+        "kind": "file",
+        "filename": "synthetic-pii-image.png",
+        "media_type": "image/png",
+    },
+    {
+        "id": "jpg",
+        "label": "Contact · JPG",
+        "kind": "file",
+        "filename": "synthetic-pii-image.jpg",
+        "media_type": "image/jpeg",
+    },
 )
 _SAMPLES_BY_ID = {sample["id"]: sample for sample in _SAMPLES}
 _PREVIEW_TEXT_SUFFIXES = {".txt", ".csv", ".json", ".xml", ".md", ".log"}
@@ -413,10 +427,10 @@ def create_app(service: RedactionChatService | None = None) -> FastAPI:
     def preview_sample(sample_id: str) -> Response:
         sample, path = _sample_path(sample_id)
         suffix = path.suffix.casefold()
-        if suffix == ".pdf":
+        if suffix == ".pdf" or suffix in _IMAGE_TYPES:
             return FileResponse(
                 path,
-                media_type="application/pdf",
+                media_type=sample["media_type"],
                 filename=sample["filename"],
                 content_disposition_type="inline",
             )

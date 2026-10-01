@@ -4,6 +4,8 @@ Place only visibly synthetic test files in `samples/input`. Supported extensions
 
 The repository includes synthetic fixtures for every supported format. Together they exercise names, reserved `example.test` email addresses, fictional `555` phone numbers, placeholder addresses, synthetic identifiers, payment test numbers, and documentation-reserved IP ranges.
 
+The web sample catalog also includes visibly synthetic PNG and JPEG fixtures for the Image Redaction Agent. Generate them with `python -m scripts.generate_synthetic_image_samples`; each image contains an explicit synthetic-data notice and OCR-readable test PII.
+
 The executor sends files to the deployed Document Redaction Agent sequentially and writes each redacted response to `samples/output` with the same filename. TXT, PDF, and DOCX outputs retain their native format; other supported formats contain redacted UTF-8 text. Input and output files are ignored by Git to prevent accidental persistence of test content.
 
 Authenticate with Azure CLI or another `DefaultAzureCredential` source. The executor reads the endpoint from `--endpoint`, `AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT`, or the currently selected azd environment, in that order. A successful `azd up` stores the deployed endpoint in that environment automatically.
