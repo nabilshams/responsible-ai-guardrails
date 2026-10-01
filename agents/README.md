@@ -7,7 +7,7 @@ Each agent owns only hosting, request validation, and orchestration. Reusable po
 | PII Redaction | Implemented | Detect and remove sensitive text using Azure AI Language only |
 | Document Redaction | Implemented | Preserve native TXT, PDF, and DOCX layout with Azure AI Language document-based PII |
 | Image Redaction | Implemented | OCR images and burn PII-aligned masks into output pixels |
-| Secret & Credential Detection | Planned | Cover runtime prompts, uploads, and tool results not protected by repository secret scanning |
+| Secret & Credential Detection | Implemented | Detect and redact runtime text credentials not protected by repository secret scanning |
 
 New agents must implement versioned input/output contracts, use managed identity, emit privacy-safe telemetry, and include offline tests plus synthetic evaluation data.
 

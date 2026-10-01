@@ -23,6 +23,13 @@ class Settings(BaseSettings):
         le=50 * 1024 * 1024,
     )
     pii_allowed_origins: list[str] = []
+    secret_minimum_entropy: float = Field(default=3.0, ge=0.0, le=8.0)
+    secret_max_request_bytes: int = Field(
+        default=1024 * 1024,
+        ge=1024,
+        le=5 * 1024 * 1024,
+    )
+    secret_additional_keywords: list[str] = Field(default_factory=list)
 
     azure_ai_language_endpoint: str | None = None
     azure_document_intelligence_endpoint: str | None = None

@@ -3,7 +3,8 @@
 ## Trust boundaries
 
 1. The calling application authenticates to the hosted agent or API through Microsoft Entra ID and private networking.
-2. The workload uses managed identity to call Azure AI Language.
+2. The workload uses managed identity to call Azure AI Language. Secret detection
+   executes locally and never validates a matched value with a provider.
 3. Original source content stays inside the processing boundary. Native document PII uses short-lived private Blob artifacts that are deleted after processing, with a one-day lifecycle rule as cleanup defense in depth.
 4. Telemetry contains correlation ID, category names, counts, latency, and status only.
 
@@ -22,7 +23,8 @@
 | Threat | Control |
 | --- | --- |
 | Sensitive content in logs | Structured metadata-only logging; tests assert no detected value is logged |
-| Regex denial of service | Pattern length limits, trusted administrators, review, and future timeout-capable regex engine |
+| Regex denial of service | Fixed reviewed patterns, escaped tenant keywords, bounded request size, and no caller-supplied regular expressions |
 | Overlapping spans leak values | Confidence-ranked normalization and reverse-order replacement |
+| Secret validation leaks credentials | Structural validation only; detected values are never transmitted for provider validation |
 | Identity key leakage | `DefaultAzureCredential`; no key settings or connection strings in source |
 | Cross-tenant policy confusion | Dedicated policy/version per tenant and tenant-bound identity in production |

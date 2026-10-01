@@ -16,6 +16,7 @@ REQUIRED_VARIABLES = (
 )
 AGENT_IMAGES = (
     ("pii-redaction-agent", "agents.pii_redaction.main"),
+    ("secret-detection-agent", "agents.secret_detection.main"),
     ("document-redaction-agent", "agents.document_redaction.main"),
     ("image-redaction-agent", "agents.image_redaction.main"),
 )

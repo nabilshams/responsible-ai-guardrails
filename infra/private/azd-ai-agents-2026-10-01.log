@@ -1,0 +1,1 @@
+[2026-10-01T08:47:32+10:00] Authentication: AzureDeveloperCLICredential.GetToken() acquired a token for scope "https://ai.azure.com/.default"

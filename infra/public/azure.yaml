@@ -38,6 +38,33 @@ services:
       resources:
         cpu: "0.5"
         memory: 1Gi
+  secret-detection-agent:
+    host: azure.ai.agent
+    kind: hosted
+    name: secret-detection-agent
+    displayName: Secret and Credential Detection Agent
+    description: Deterministically detects and redacts runtime credentials without transmitting matched values.
+    project: ../..
+    language: docker
+    docker:
+      path: Dockerfile
+      remoteBuild: true
+      buildArgs:
+        - AGENT_MODULE=agents.secret_detection.main
+    uses:
+      - ai-project
+    protocols:
+      - protocol: invocations
+        version: 1.0.0
+    metadata:
+      tags:
+        - Responsible AI
+        - Secrets
+        - Data Protection
+    container:
+      resources:
+        cpu: "0.5"
+        memory: 1Gi
   document-redaction-agent:
     host: azure.ai.agent
     kind: hosted

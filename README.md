@@ -1,6 +1,6 @@
 # Responsible AI Guardrails
 
-Azure AI Language-based PII redaction for text and native documents, exposed through independently deployable Microsoft Foundry hosted agents.
+PII and runtime secret redaction for text and native documents, exposed through independently deployable Microsoft Foundry hosted agents.
 
 This repository is an accelerator, not a guarantee that every sensitive value will be detected. Validate detection categories, supported languages, accuracy, and retention against the policies that apply to your organization before processing production data.
 
@@ -8,7 +8,7 @@ This repository is an accelerator, not a guarantee that every sensitive value wi
 
 | Input | Redaction path | Output |
 | --- | --- | --- |
-| Text, prompts, and responses | Azure AI Language text PII | Redacted text plus category counts |
+| Text, prompts, and responses | Azure AI Language text PII followed by deterministic secret detection | Redacted text plus category counts |
 | `.pdf`, `.docx` | Azure AI Language Document-based PII | Redacted native document |
 | `.txt`, `.csv`, `.json`, `.xml`, `.md`, `.log` | Azure AI Language text PII | Redacted UTF-8 text |
 | Images | Document Intelligence OCR geometry and Azure AI Language PII | Redacted PNG |
@@ -20,6 +20,7 @@ Native document redaction uploads each PDF or DOCX file to private temporary Blo
 ```text
 agents/                         Hosted agent adapters
   pii_redaction/                Text PII Redaction Agent
+  secret_detection/             Runtime Secret Detection Agent
   document_redaction/           Native and structured document redaction
   image_redaction/              Image PII redaction
 shared/guardrails/              Detection, policies, document services, and native PII adapter
@@ -32,7 +33,7 @@ docs/                           Architecture, security, evaluation, and deployme
 
 ## Security Model
 
-- Azure AI Language is the PII detection and redaction service. This solution does not send document content to a generative model.
+- Azure AI Language detects PII. Runtime secret signatures and entropy checks execute locally. Neither path sends content to a generative model.
 - Authentication uses `DefaultAzureCredential`; do not add Azure service keys, connection strings, SAS tokens, or production PII to source control.
 - Keep source files and generated outputs outside Git. Supplied sample files are visibly synthetic only.
 - The deployed Document Redaction Agent returns native document bytes as base64 over the Invocations protocol. The executor decodes them and writes the result to disk.
@@ -257,7 +258,7 @@ azd -C infra/public provision --preview
 azd -C infra/public up --no-prompt
 ```
 
-After `azd up`, Bicep outputs and Foundry deployment outputs are persisted in the selected `azd` environment. The private profile uses an explicit provision-before-package workflow so the generated ACR endpoint exists before azd resolves passthrough image references. Its `preprovision` hook removes legacy Premium-only ACR resources when upgrading an existing environment, and its `predeploy` hook builds hosted-agent images with ordinary ACR Tasks. The `postup` hooks configure hosted-agent and web-chat RBAC, build the chat image in ACR, inject the three invocation endpoints into the Container App, and verify required variable names without displaying their values.
+After `azd up`, Bicep outputs and Foundry deployment outputs are persisted in the selected `azd` environment. The private profile uses an explicit provision-before-package workflow so the generated ACR endpoint exists before azd resolves passthrough image references. Its `preprovision` hook removes legacy Premium-only ACR resources when upgrading an existing environment, and its `predeploy` hook builds hosted-agent images with ordinary ACR Tasks. The `postup` hooks configure hosted-agent and web-chat RBAC, build the chat image in ACR, inject the four invocation endpoints into the Container App, and verify required variable names without displaying their values.
 
 Use a fresh environment when changing profiles because Foundry network injection cannot be changed after account creation. The `S` and `S0` tiers incur usage charges. See [infra/README.md](infra/README.md) for infrastructure-only deployment and retry steps.
 

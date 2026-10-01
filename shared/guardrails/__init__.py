@@ -1,6 +1,14 @@
 """Reusable guardrail primitives."""
 
 from .models import DetectedEntity, EntityResult, RedactionResult
+from .secrets import SecretDetector, SecretRedactionService
 from .service import PiiRedactionService
 
-__all__ = ["DetectedEntity", "EntityResult", "PiiRedactionService", "RedactionResult"]
+__all__ = [
+    "DetectedEntity",
+    "EntityResult",
+    "PiiRedactionService",
+    "RedactionResult",
+    "SecretDetector",
+    "SecretRedactionService",
+]

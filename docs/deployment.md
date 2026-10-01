@@ -94,6 +94,7 @@ Each runtime managed identity is created only during `azd deploy`. The `azd up` 
 | Hosted agent | Required role assignments |
 | --- | --- |
 | PII Redaction Agent | `Cognitive Services User` on Azure AI Language |
+| Secret Detection Agent | No additional Azure resource role |
 | Document Redaction Agent | `Cognitive Services User` on Azure AI Language; `Storage Blob Data Contributor` on temporary document Storage |
 | Image Redaction Agent | `Cognitive Services User` on Azure AI Language and Document Intelligence |
 

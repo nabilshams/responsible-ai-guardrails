@@ -33,12 +33,15 @@ def test_builds_each_agent_with_standard_acr_tasks(
         }
     )
 
-    assert len(commands) == 3
+    assert len(commands) == 4
     assert all("--agent-pool" not in command for command in commands)
     assert all("--no-logs" in command for command in commands)
     assert all(
         command[-1] == str(build_agent_images.REPOSITORY_ROOT)
         for command in commands
+    )
+    assert any(
+        "AGENT_MODULE=agents.secret_detection.main" in command for command in commands
     )
 
 

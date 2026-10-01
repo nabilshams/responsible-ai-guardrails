@@ -24,6 +24,7 @@ from scripts.live_agent_client import LiveAgentClient
 pytestmark = pytest.mark.azure
 
 _SYNTHETIC_EMAIL = "synthetic.user@example.test"
+_SYNTHETIC_CREDENTIAL = "synthetic_client_secret_Q7v9X2m4"
 _RUN_LIVE = os.getenv("RUN_LIVE_AGENT_TESTS", "").casefold() in {"1", "true", "yes"}
 
 
@@ -140,6 +141,33 @@ async def test_live_pii_agent_redacts_synthetic_text(
         {"input": f"Synthetic contact: {_SYNTHETIC_EMAIL}", "language": "en"},
     )
     _assert_email_redacted(result)
+
+
+@pytest.mark.asyncio
+async def test_live_secret_agent_redacts_synthetic_runtime_secret(
+    live_connection: tuple[DefaultAzureCredential, float],
+) -> None:
+    credential, timeout = live_connection
+    client = LiveAgentClient(
+        _agent_endpoint(
+            "AGENT_SECRET_DETECTION_AGENT_INVOCATIONS_ENDPOINT",
+            "Secret and Credential Detection Agent",
+        ),
+        credential,
+        timeout_seconds=timeout,
+    )
+    result = await client.invoke(
+        {
+            "contract_version": "1.0",
+            "input": f"client_secret={_SYNTHETIC_CREDENTIAL}",
+        },
+    )
+
+    assert result.get("contract_version") == "1.0"
+    redacted_text = result.get("redacted_text")
+    assert isinstance(redacted_text, str)
+    assert _SYNTHETIC_CREDENTIAL not in redacted_text
+    assert "[REDACTED:GENERICSECRET]" in redacted_text
 
 
 @pytest.mark.parametrize(

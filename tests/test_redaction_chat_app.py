@@ -14,6 +14,7 @@ from scripts.redaction_chat_app import (
     RedactionChatService,
     create_app,
 )
+from shared.guardrails.secrets import SecretDetector, SecretRedactionService
 
 
 class StubClient:
@@ -34,8 +35,25 @@ def _png() -> bytes:
 
 @pytest.mark.asyncio
 async def test_routes_text_and_files_without_echoing_original_values() -> None:
+    synthetic_credential = "synthetic_client_secret_Q7v9X2m4"
     text_client = StubClient(
-        {"redacted_text": "Contact [REDACTED:EMAIL]", "entity_counts": {"Email": 1}},
+        {
+            "redacted_text": (
+                "Contact [REDACTED:EMAIL] "
+                f"client_secret={synthetic_credential}"
+            ),
+            "entity_counts": {"Email": 1},
+        },
+    )
+    secret_client = StubClient(
+        {
+            "contract_version": "1.0",
+            "redacted_text": (
+                "Contact [REDACTED:EMAIL] "
+                "client_secret=[REDACTED:GENERICSECRET]"
+            ),
+            "entity_counts": {"GenericSecret": 1},
+        },
     )
     document_client = StubClient(
         {"redacted_text": "[REDACTED:EMAIL]", "entity_counts": {"Email": 1}},
@@ -48,12 +66,16 @@ async def test_routes_text_and_files_without_echoing_original_values() -> None:
     )
     clients = {
         "AGENT_PII_REDACTION_AGENT_INVOCATIONS_ENDPOINT": text_client,
+        "AGENT_SECRET_DETECTION_AGENT_INVOCATIONS_ENDPOINT": secret_client,
         "AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT": document_client,
         "AGENT_IMAGE_REDACTION_AGENT_INVOCATIONS_ENDPOINT": image_client,
     }
     service = RedactionChatService(clients.__getitem__)
     request = RedactionChatRequest(
-        message="Contact synthetic.user@example.test",
+        message=(
+            "Contact synthetic.user@example.test "
+            f"client_secret={synthetic_credential}"
+        ),
         files=[
             AttachmentRequest(
                 name="private-customer.txt",
@@ -69,13 +91,26 @@ async def test_routes_text_and_files_without_echoing_original_values() -> None:
     response = await service.redact(request)
     serialized = response.model_dump_json()
 
-    assert response.redacted_text == "Contact [REDACTED:EMAIL]"
+    assert response.redacted_text == (
+        "Contact [REDACTED:EMAIL] client_secret=[REDACTED:GENERICSECRET]"
+    )
     assert [item.download_name for item in response.files] == [
         "redacted-1.txt",
         "redacted-2.png",
     ]
     assert "synthetic.user@example.test" not in serialized
+    assert synthetic_credential not in serialized
     assert "private-customer" not in serialized
+    assert response.text_entity_counts == {"Email": 1, "GenericSecret": 1}
+    assert secret_client.payloads == [
+        {
+            "contract_version": "1.0",
+            "input": (
+                "Contact [REDACTED:EMAIL] "
+                f"client_secret={synthetic_credential}"
+            ),
+        }
+    ]
     assert document_client.payloads[0]["document"]["filename"] == "upload-1.txt"
     assert image_client.payloads[0]["image"]["filename"] == "upload-2.jpg"
 
@@ -138,11 +173,28 @@ def test_lists_ready_to_use_samples() -> None:
     assert response.status_code == 200
     samples = response.json()
     ids = {sample["id"] for sample in samples}
-    assert {"text", "txt", "csv", "json", "docx", "pdf"} <= ids
+    assert {"text", "secrets", "txt", "csv", "json", "docx", "pdf"} <= ids
     text_sample = next(sample for sample in samples if sample["id"] == "text")
     assert text_sample["kind"] == "text"
     assert text_sample["text"].strip()
     assert text_sample["previewable"] is False
+    secrets_sample = next(sample for sample in samples if sample["id"] == "secrets")
+    assert secrets_sample["kind"] == "text"
+    assert "NON-FUNCTIONAL EXAMPLES" in secrets_sample["text"]
+    detected_values = [
+        entity.value for entity in SecretDetector().detect(secrets_sample["text"])
+    ]
+    result = SecretRedactionService().redact(secrets_sample["text"])
+    assert result.entity_counts == {
+        "BearerToken": 1,
+        "ConnectionStringSecret": 1,
+        "GenericSecret": 1,
+        "GitHubToken": 1,
+        "JsonWebToken": 1,
+        "ProviderApiKey": 1,
+        "SasSignature": 1,
+    }
+    assert all(value not in result.redacted_text for value in detected_values)
     pdf_sample = next(sample for sample in samples if sample["id"] == "pdf")
     assert pdf_sample["previewable"] is True
 

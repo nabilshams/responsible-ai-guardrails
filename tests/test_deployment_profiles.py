@@ -60,11 +60,13 @@ def test_profile_parameters_do_not_expose_network_mode_switches() -> None:
 def test_private_manifest_uses_prebuilt_public_acr_images() -> None:
     manifest = (INFRA_ROOT / "private" / "azure.yaml").read_text(encoding="utf-8")
 
-    assert manifest.count("project: .") == 3
-    assert manifest.count("language: docker") == 3
-    assert manifest.count("imagePassthrough: true") == 3
-    assert manifest.count("remoteBuild: false") == 3
-    assert manifest.count("${AZURE_CONTAINER_REGISTRY_ENDPOINT=bootstrap.invalid}") == 3
+    assert manifest.count("project: .") == 4
+    assert manifest.count("language: docker") == 4
+    assert manifest.count("imagePassthrough: true") == 4
+    assert manifest.count("remoteBuild: false") == 4
+    assert manifest.count("${AZURE_CONTAINER_REGISTRY_ENDPOINT=bootstrap.invalid}") == 4
+    assert "agents.secret_detection.main" not in manifest
+    assert "/secret-detection-agent:${AZURE_ENV_NAME}" in manifest
     assert "- azd: provision" in manifest
     assert "- azd: package --all" in manifest
     assert "- azd: deploy --all" in manifest
@@ -77,11 +79,12 @@ def test_private_manifest_uses_prebuilt_public_acr_images() -> None:
 def test_public_manifest_uses_standard_acr_remote_builds() -> None:
     manifest = (INFRA_ROOT / "public" / "azure.yaml").read_text(encoding="utf-8")
 
-    assert manifest.count("project: ../..") == 3
-    assert manifest.count("language: docker") == 3
-    assert manifest.count("remoteBuild: true") == 3
-    assert manifest.count("path: Dockerfile") == 3
-    assert manifest.count("AGENT_MODULE=") == 3
+    assert manifest.count("project: ../..") == 4
+    assert manifest.count("language: docker") == 4
+    assert manifest.count("remoteBuild: true") == 4
+    assert manifest.count("path: Dockerfile") == 4
+    assert manifest.count("AGENT_MODULE=") == 4
+    assert "AGENT_MODULE=agents.secret_detection.main" in manifest
     assert "codeConfiguration:" not in manifest
 
 

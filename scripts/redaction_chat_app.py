@@ -1,4 +1,4 @@
-"""Local web API for text, document, and image redaction agents."""
+"""Local web API for PII, secret, document, and image redaction agents."""
 
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ _MAX_FILES = 10
 _WEB_ROOT = Path(__file__).resolve().parents[1] / "web"
 
 _TEXT_ENDPOINT = "AGENT_PII_REDACTION_AGENT_INVOCATIONS_ENDPOINT"
+_CREDENTIAL_REDACTION_ENDPOINT = "AGENT_SECRET_DETECTION_AGENT_INVOCATIONS_ENDPOINT"
 _DOCUMENT_ENDPOINT = "AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT"
 _IMAGE_ENDPOINT = "AGENT_IMAGE_REDACTION_AGENT_INVOCATIONS_ENDPOINT"
 
@@ -51,6 +52,13 @@ _SAMPLES: tuple[dict[str, str], ...] = (
         "label": "PII text",
         "kind": "text",
         "filename": "synthetic-contact.txt",
+        "media_type": "text/plain",
+    },
+    {
+        "id": "secrets",
+        "label": "Secrets text",
+        "kind": "text",
+        "filename": "synthetic-secrets.txt",
         "media_type": "text/plain",
     },
     {
@@ -160,11 +168,18 @@ class RedactionChatService:
         redacted_text: str | None = None
         text_counts: dict[str, int] = {}
         if request.message.strip():
-            result = await self._client(_TEXT_ENDPOINT).invoke(
+            pii_result = await self._client(_TEXT_ENDPOINT).invoke(
                 {"message": request.message, "language": request.language},
             )
-            redacted_text = _required_string(result, "redacted_text")
-            text_counts = _entity_counts(result)
+            pii_redacted_text = _required_string(pii_result, "redacted_text")
+            secret_result = await self._client(_CREDENTIAL_REDACTION_ENDPOINT).invoke(
+                {"contract_version": "1.0", "input": pii_redacted_text},
+            )
+            redacted_text = _required_string(secret_result, "redacted_text")
+            text_counts = _merge_entity_counts(
+                _entity_counts(pii_result),
+                _entity_counts(secret_result),
+            )
 
         redacted_files = []
         for index, attachment in enumerate(request.files, start=1):
@@ -283,6 +298,14 @@ def _entity_counts(result: dict[str, Any]) -> dict[str, int]:
         for key, value in counts.items()
         if isinstance(key, str) and isinstance(value, int) and value >= 0
     }
+
+
+def _merge_entity_counts(*counts: dict[str, int]) -> dict[str, int]:
+    merged: dict[str, int] = {}
+    for group in counts:
+        for category, count in group.items():
+            merged[category] = merged.get(category, 0) + count
+    return dict(sorted(merged.items()))
 
 
 def create_app(service: RedactionChatService | None = None) -> FastAPI:

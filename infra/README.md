@@ -166,6 +166,7 @@ The Bicep templates configure ACR pull access for the Foundry project identity a
 | Hosted agent | Resource scope | Built-in role |
 | --- | --- | --- |
 | PII Redaction Agent | Azure AI Language | Cognitive Services User |
+| Secret Detection Agent | None | No additional resource role required |
 | Document Redaction Agent | Azure AI Language | Cognitive Services User |
 | Document Redaction Agent | Temporary document Storage account | Storage Blob Data Contributor |
 | Image Redaction Agent | Azure AI Language | Cognitive Services User |

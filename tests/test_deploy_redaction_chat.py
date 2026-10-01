@@ -50,7 +50,7 @@ def test_builds_and_configures_chat_without_printing_values(
     assert "system" in commands[1]
     update = commands[3]
     assert any(item.endswith("/redaction-chat:synthetic-tag") for item in update)
-    assert sum("INVOCATIONS_ENDPOINT=" in item for item in update) == 3
+    assert sum("INVOCATIONS_ENDPOINT=" in item for item in update) == 4
 
 
 def test_reports_only_missing_variable_names() -> None:
