@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import base64
 import binascii
+import zipfile
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Protocol
+from xml.etree import ElementTree
 
 from azure.identity import DefaultAzureCredential
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel, Field
 
@@ -100,6 +102,8 @@ _SAMPLES: tuple[dict[str, str], ...] = (
     },
 )
 _SAMPLES_BY_ID = {sample["id"]: sample for sample in _SAMPLES}
+_PREVIEW_TEXT_SUFFIXES = {".txt", ".csv", ".json", ".xml", ".md", ".log"}
+_WORD_NAMESPACE = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 
 
 class AgentClient(Protocol):
@@ -131,6 +135,38 @@ class RedactionChatResponse(BaseModel):
 
 
 ClientProvider = Callable[[str], AgentClient]
+
+
+def _sample_path(sample_id: str) -> tuple[dict[str, str], Path]:
+    sample = _SAMPLES_BY_ID.get(sample_id)
+    if sample is None or sample["kind"] != "file":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown sample")
+    path = _SAMPLES_ROOT / sample["filename"]
+    if not path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
+    return sample, path
+
+
+def _docx_preview(path: Path) -> str:
+    try:
+        with zipfile.ZipFile(path) as package:
+            document = package.read("word/document.xml")
+        # The package is a fixed synthetic repository fixture, never a user upload.
+        root = ElementTree.fromstring(document)  # noqa: S314
+    except (KeyError, OSError, zipfile.BadZipFile, ElementTree.ParseError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Sample preview is unavailable",
+        ) from exc
+
+    paragraphs = []
+    for paragraph in root.iter(f"{{{_WORD_NAMESPACE}}}p"):
+        text = "".join(
+            node.text or "" for node in paragraph.iter(f"{{{_WORD_NAMESPACE}}}t")
+        )
+        if text:
+            paragraphs.append(text)
+    return "\n\n".join(paragraphs)
 
 
 class RedactionChatService:
@@ -351,7 +387,7 @@ def create_app(service: RedactionChatService | None = None) -> FastAPI:
                 "label": sample["label"],
                 "kind": sample["kind"],
                 "filename": sample["filename"],
-                "previewable": sample["media_type"] == "application/pdf",
+                "previewable": sample["kind"] == "file",
             }
             if sample["kind"] == "text":
                 try:
@@ -365,17 +401,38 @@ def create_app(service: RedactionChatService | None = None) -> FastAPI:
 
     @application.get("/api/samples/{sample_id}", include_in_schema=False)
     def get_sample(sample_id: str) -> FileResponse:
-        sample = _SAMPLES_BY_ID.get(sample_id)
-        if sample is None or sample["kind"] != "file":
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown sample")
-        path = _SAMPLES_ROOT / sample["filename"]
-        if not path.is_file():
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
+        sample, path = _sample_path(sample_id)
         return FileResponse(
             path,
             media_type=sample["media_type"],
             filename=sample["filename"],
             content_disposition_type="inline",
+        )
+
+    @application.get("/api/samples/{sample_id}/preview", include_in_schema=False)
+    def preview_sample(sample_id: str) -> Response:
+        sample, path = _sample_path(sample_id)
+        suffix = path.suffix.casefold()
+        if suffix == ".pdf":
+            return FileResponse(
+                path,
+                media_type="application/pdf",
+                filename=sample["filename"],
+                content_disposition_type="inline",
+            )
+        if suffix == ".docx":
+            return PlainTextResponse(_docx_preview(path))
+        if suffix in _PREVIEW_TEXT_SUFFIXES:
+            try:
+                return PlainTextResponse(path.read_text(encoding="utf-8-sig"))
+            except (OSError, UnicodeDecodeError) as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail="Sample preview is unavailable",
+                ) from exc
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Sample preview is unavailable",
         )
 
     @application.post("/api/redact", response_model=RedactionChatResponse)

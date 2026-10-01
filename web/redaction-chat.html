@@ -629,9 +629,13 @@
       return `/api/samples/${encodeURIComponent(sample.id)}`;
     }
 
+    function samplePreviewUrl(sample) {
+      return `${sampleUrl(sample)}/preview`;
+    }
+
     function openSamplePreview(sample) {
       elements.previewTitle.textContent = sample.label;
-      elements.previewFrame.src = sampleUrl(sample);
+      elements.previewFrame.src = samplePreviewUrl(sample);
       elements.downloadSample.href = sampleUrl(sample);
       elements.downloadSample.download = sample.filename;
       elements.usePreviewSample.onclick = async () => {

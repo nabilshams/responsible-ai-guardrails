@@ -197,8 +197,9 @@ def test_lists_ready_to_use_samples() -> None:
         "SasSignature": 1,
     }
     assert all(value not in result.redacted_text for value in detected_values)
-    pdf_sample = next(sample for sample in samples if sample["id"] == "pdf")
-    assert pdf_sample["previewable"] is True
+    file_samples = [sample for sample in samples if sample["kind"] == "file"]
+    assert file_samples
+    assert all(sample["previewable"] is True for sample in file_samples)
 
 
 def test_serves_a_named_sample_file() -> None:
@@ -210,6 +211,34 @@ def test_serves_a_named_sample_file() -> None:
     assert response.headers["content-type"] == "application/pdf"
     assert response.headers["content-disposition"].startswith("inline;")
     assert response.content
+
+
+@pytest.mark.parametrize(
+    ("sample_id", "content_type", "expected_text"),
+    [
+        ("txt", "text/plain", "SYNTHETIC MIXED TEST DATA"),
+        ("csv", "text/plain", "synthetic.alpha@example.test"),
+        ("json", "text/plain", '"credential_notice"'),
+        ("docx", "text/plain", "SYNTHETIC"),
+        ("pdf", "application/pdf", None),
+    ],
+)
+def test_previews_every_sample_file_format(
+    sample_id: str,
+    content_type: str,
+    expected_text: str | None,
+) -> None:
+    client = TestClient(create_app(RedactionChatService(lambda _: StubClient({}))))
+
+    response = client.get(f"/api/samples/{sample_id}/preview")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith(content_type)
+    if expected_text is None:
+        assert response.headers["content-disposition"].startswith("inline;")
+        assert response.content.startswith(b"%PDF")
+    else:
+        assert expected_text in response.text
 
 
 @pytest.mark.parametrize(

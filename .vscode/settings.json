@@ -14,6 +14,10 @@
     "git check-ignore": true,
     "&": true,
     "az": true,
-    ".\\.venv\\Scripts\\python.exe": true
+    ".\\.venv\\Scripts\\python.exe": true,
+    "/^az containerapp show --name ca-redaction-chat-raiprivate-xey --resource-group rg-rai-private --query \"\\{state:properties\\.provisioningState,revision:properties\\.latestReadyRevisionName,image:properties\\.template\\.containers\\[0\\]\\.image\\}\" --output json$/": {
+      "approve": true,
+      "matchCommandLine": true
+    }
   }
 }
