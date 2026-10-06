@@ -149,6 +149,9 @@ def test_serves_chat_interface() -> None:
     assert response.status_code == 200
     assert 'id="composer"' in response.text
     assert 'id="sample-preview"' in response.text
+    assert "Sensitive Data Protection" in response.text
+    assert "Remove sensitive information before using or sharing content" in response.text
+    assert "Automated detection can miss sensitive information" in response.text
     assert "Use this sample" in response.text
     assert 'fetch("/api/redact"' in response.text
 

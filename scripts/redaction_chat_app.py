@@ -367,7 +367,7 @@ def create_app(service: RedactionChatService | None = None) -> FastAPI:
         chat_service.close()
 
     application = FastAPI(
-        title="Redaction Chat",
+        title="Sensitive Data Protection",
         version="0.1.0",
         docs_url=None,
         redoc_url=None,

@@ -11,7 +11,7 @@
       document.documentElement.setAttribute("data-theme", theme);
     })();
   </script>
-  <title>Redaction Chat</title>
+  <title>Sensitive Data Protection</title>
   <style>
     :root {
       color-scheme: light;
@@ -425,8 +425,8 @@
       <div class="brand">
         <div class="brand-mark"><i data-lucide="shield-check"></i></div>
         <div class="brand-copy">
-          <h1>Redaction Chat</h1>
-          <p>Responsible AI Guardrails</p>
+          <h1>Sensitive Data Protection</h1>
+          <p>Remove sensitive information before using or sharing content</p>
         </div>
       </div>
       <div class="top-actions">
@@ -439,11 +439,11 @@
 
     <div class="workspace">
       <aside class="rail">
-        <p class="rail-label">Specialists</p>
+        <p class="rail-label">What we can protect</p>
         <div class="mode-list">
-          <div class="mode"><div class="mode-icon"><i data-lucide="message-square-text"></i></div><div><strong>Text</strong><span>PII and secret redaction</span></div></div>
-          <div class="mode"><div class="mode-icon"><i data-lucide="files"></i></div><div><strong>Documents</strong><span>Native and structured</span></div></div>
-          <div class="mode"><div class="mode-icon"><i data-lucide="scan-line"></i></div><div><strong>Images</strong><span>OCR pixel masking</span></div></div>
+          <div class="mode"><div class="mode-icon"><i data-lucide="message-square-text"></i></div><div><strong>Text</strong><span>Personal information and credentials</span></div></div>
+          <div class="mode"><div class="mode-icon"><i data-lucide="files"></i></div><div><strong>Documents</strong><span>PDFs, Word documents, and data files</span></div></div>
+          <div class="mode"><div class="mode-icon"><i data-lucide="scan-line"></i></div><div><strong>Images</strong><span>Personal information visible in images</span></div></div>
         </div>
         <p class="rail-label more">Supported inputs</p>
         <div class="support">
@@ -452,23 +452,24 @@
           <div class="support-item"><strong>Images</strong><span>PNG, JPG, JPEG</span></div>
           <div class="support-item"><strong>Size limit</strong><span>10 MB per file &middot; up to 10 files</span></div>
         </div>
-        <div class="privacy-note">Submitted source content is not added to conversation history. Returned content has passed through the selected redaction specialist.</div>
+        <div class="privacy-note">Your original content is not shown in the activity history. Automated detection can miss sensitive information, so always review the redacted copy before using or sharing it.</div>
       </aside>
 
-      <section class="chat" aria-label="Redaction conversation">
+      <section class="chat" aria-label="Sensitive data protection activity">
         <div class="messages" id="messages" aria-live="polite">
           <div class="empty" id="empty">
             <div class="empty-mark"><i data-lucide="shield-ellipsis"></i></div>
-            <h2>Ready for a redaction request</h2>
-            <p>Enter text, attach supported files, or combine both in one request. Supported files: PDF, DOCX, TXT, CSV, JSON, XML, MD, LOG, PNG, JPG, JPEG &mdash; up to 10 MB each (10 files max).</p>
+            <h2>Protect sensitive information</h2>
+            <p>Enter text or add documents and images. The application creates redacted copies that you can review before using with AI, indexing for search, or sharing with others.</p>
+            <p>PDF, DOCX, TXT, CSV, JSON, XML, MD, LOG, PNG, JPG, and JPEG &middot; 10 MB per file &middot; 10 files per request</p>
           </div>
         </div>
 
         <div class="composer-wrap">
           <div class="samples" id="samples" aria-label="Sample inputs"></div>
           <form class="composer" id="composer">
-            <label class="sr-only" for="message">Text to redact</label>
-            <textarea id="message" maxlength="100000" placeholder="Enter text for redaction" rows="3"></textarea>
+            <label class="sr-only" for="message">Text containing personal information or credentials to remove</label>
+            <textarea id="message" maxlength="100000" placeholder="Enter text containing personal information or credentials" rows="3"></textarea>
             <div class="attachments" id="attachments"></div>
             <div class="composer-actions">
               <div class="attachment-summary">
@@ -483,7 +484,7 @@
                   <option value="de">German</option>
                 </select>
               </div>
-              <button class="primary-button" id="send" type="submit"><i data-lucide="send"></i><span>Redact</span></button>
+              <button class="primary-button" id="send" type="submit"><i data-lucide="send"></i><span>Remove sensitive information</span></button>
             </div>
           </form>
         </div>
@@ -707,7 +708,7 @@
       const heading = document.createElement("div");
       heading.className = "message-heading";
       const title = document.createElement("strong");
-      title.textContent = kind === "request" ? "Request" : kind === "error" ? "Request failed" : "Redaction result";
+      title.textContent = kind === "request" ? "Request" : kind === "error" ? "Request failed" : "Redacted copy";
       const time = document.createElement("time");
       time.textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       heading.append(title, time);
@@ -742,7 +743,7 @@
         name.textContent = file.download_name;
         const counts = Object.values(file.entity_counts || {}).reduce((total, value) => total + value, 0);
         const detail = document.createElement("span");
-        detail.textContent = `${file.content_type} · ${counts} detection${counts === 1 ? "" : "s"}`;
+        detail.textContent = `${file.content_type} · ${counts} item${counts === 1 ? "" : "s"} detected and removed`;
         info.append(name, detail);
         const button = document.createElement("button");
         button.className = "download-button";
@@ -772,7 +773,7 @@
       elements.send.disabled = busy;
       elements.attach.disabled = busy;
       elements.send.classList.toggle("loading", busy);
-      elements.send.querySelector("span").textContent = busy ? "Redacting" : "Redact";
+      elements.send.querySelector("span").textContent = busy ? "Removing sensitive information" : "Remove sensitive information";
       elements.send.querySelector("svg")?.remove();
       elements.send.insertAdjacentHTML("afterbegin", `<i data-lucide="${busy ? "loader-circle" : "send"}"></i>`);
       lucide.createIcons();
@@ -783,7 +784,7 @@
       const files = [...state.files];
       if (!message.trim() && !files.length) return;
       setBusy(true);
-      addMessage("request", "Source content submitted for redaction.", {
+      addMessage("request", "Your content is being checked and redacted.", {
         meta: `${message.trim() ? `${message.length} text characters` : "No text"} · ${files.length} file${files.length === 1 ? "" : "s"}`
       });
       elements.message.value = "";
@@ -803,8 +804,8 @@
         const payload = await response.json();
         if (!response.ok) throw new Error(typeof payload.detail === "string" ? payload.detail : "Redaction request failed");
         const total = Object.values(payload.text_entity_counts || {}).reduce((sum, value) => sum + value, 0);
-        addMessage("response", payload.redacted_text || (payload.files.length ? "Redacted files are ready." : "No redacted content was returned."), {
-          meta: payload.redacted_text ? `${total} text detection${total === 1 ? "" : "s"}` : "",
+        addMessage("response", payload.redacted_text || (payload.files.length ? "Your redacted copies are ready to review." : "No redacted copy was returned."), {
+          meta: payload.redacted_text ? `${total} item${total === 1 ? "" : "s"} detected and removed · Review before use or sharing` : "",
           files: payload.files
         });
       } catch (error) {
@@ -839,7 +840,7 @@
       elements.messages.replaceChildren();
       const empty = document.createElement("div");
       empty.className = "empty";
-      empty.innerHTML = `<div class="empty-mark"><i data-lucide="shield-ellipsis"></i></div><h2>Ready for a redaction request</h2><p>Enter text, attach supported files, or combine both in one request.</p>`;
+      empty.innerHTML = `<div class="empty-mark"><i data-lucide="shield-ellipsis"></i></div><h2>Protect sensitive information</h2><p>Enter text or add documents and images. Always review the redacted copy before using or sharing it.</p>`;
       elements.messages.append(empty);
       lucide.createIcons();
     });
