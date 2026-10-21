@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,8 +13,10 @@ from azure.identity import DefaultAzureCredential
 from .config import Settings
 from .documents import DocumentExtractor
 from .images import ImageRedactor
-from .models import RedactionResult
+from .models import DetectedEntity, RedactionResult
 from .native_document_pii import NativeDocumentPiiRedactor, NativeDocumentRedactionResult
+from .pdf_redaction import PdfSpanRedactor
+from .pipeline import CustomTermDetector
 from .redactor import normalize_entities, redact_text
 from .secrets import SecretDetector
 from .service import PiiRedactionService
@@ -22,6 +25,24 @@ logger = logging.getLogger(__name__)
 
 # Plain .txt uses the text path; the native document API only handles .pdf and .docx.
 _NATIVE_DOCUMENT_SUFFIXES = {".pdf", ".docx"}
+MAX_REQUEST_CUSTOM_TERMS = 100
+
+
+def parse_custom_terms(value: object) -> tuple[str, ...]:
+    """Validate request-supplied custom words and phrases."""
+    if value is None:
+        return ()
+    if not isinstance(value, list) or not all(isinstance(term, str) for term in value):
+        raise ValueError("custom_terms must be a list of strings")
+    if len(value) > MAX_REQUEST_CUSTOM_TERMS:
+        raise ValueError("custom_terms exceeds the maximum number of terms")
+    terms = tuple(term for term in value if term.strip())
+    CustomTermDetector(terms)  # validates term length
+    return terms
+
+
+def _custom_term_entities(text: str, terms: Sequence[str]) -> list[DetectedEntity]:
+    return CustomTermDetector(terms).detect(text) if terms else []
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,9 +63,11 @@ class DocumentRedactionService:
         pii_service: PiiRedactionService | None = None,
         extractor: DocumentExtractor | None = None,
         secret_detector: SecretDetector | None = None,
+        pdf_redactor: PdfSpanRedactor | None = None,
     ) -> None:
         self.settings = settings or Settings()
         self.pii_service = pii_service or PiiRedactionService(self.settings)
+        self.pdf_redactor = pdf_redactor or PdfSpanRedactor()
         self.secret_detector = secret_detector or SecretDetector(
             minimum_entropy=self.settings.secret_minimum_entropy,
             additional_keywords=self.settings.secret_additional_keywords,
@@ -63,6 +86,7 @@ class DocumentRedactionService:
         *,
         language: str | None = None,
         correlation_id: str | None = None,
+        custom_terms: Sequence[str] = (),
     ) -> RedactionResult:
         if len(content) > self.settings.pii_max_upload_bytes:
             raise ValueError("Document exceeds the configured upload limit")
@@ -76,6 +100,7 @@ class DocumentRedactionService:
             self.settings.pii_confidence_threshold,
         )
         secret_entities = self.secret_detector.detect(document.text)
+        pii_entities.extend(_custom_term_entities(document.text, custom_terms))
         result = redact_text(
             document.text,
             (*pii_entities, *secret_entities),
@@ -91,6 +116,53 @@ class DocumentRedactionService:
             sorted(result.entity_counts),
         )
         return result
+
+    def redact_pdf(
+        self,
+        content: bytes,
+        content_type: str,
+        filename: str,
+        *,
+        language: str | None = None,
+        correlation_id: str | None = None,
+        custom_terms: Sequence[str] = (),
+    ) -> NativeDocumentRedactionResult:
+        """Redact PII, secrets, and custom terms from a PDF using page geometry.
+
+        Document Intelligence locates each detected span on its page and the secure
+        span redactor removes the underlying text, so values cannot be extracted.
+        """
+        if len(content) > self.settings.pii_max_upload_bytes:
+            raise ValueError("Document exceeds the configured upload limit")
+        if not content:
+            raise ValueError("Document content cannot be empty")
+        if content_type != "application/pdf":
+            raise ValueError("Document content type does not match its filename")
+        document = self.extractor.extract(content, content_type, filename)
+        request_id = correlation_id or str(uuid.uuid4())
+        selected = normalize_entities(
+            (
+                *self.pii_service.detect(document.text, language),
+                *self.secret_detector.detect(document.text),
+                *_custom_term_entities(document.text, custom_terms),
+            ),
+            len(document.text),
+            self.settings.pii_confidence_threshold,
+        )
+        redacted = self.pdf_redactor.redact(content, document, selected)
+        logger.info(
+            "Structured PDF redaction completed correlation_id=%s entity_count=%d "
+            "categories=%s",
+            request_id,
+            len(selected),
+            sorted({entity.category for entity in selected}),
+        )
+        return NativeDocumentRedactionResult(
+            content=redacted,
+            content_type="application/pdf",
+            filename=Path(filename).name,
+            correlation_id=request_id,
+        )
 
 
 class DocumentAgentService:
@@ -119,9 +191,22 @@ class DocumentAgentService:
         *,
         language: str | None = None,
         correlation_id: str | None = None,
+        custom_terms: Sequence[str] = (),
     ) -> RedactionResult | NativeDocumentRedactionResult:
         selected_language = language or self.settings.pii_default_language
-        if Path(filename).suffix.casefold() in _NATIVE_DOCUMENT_SUFFIXES:
+        suffix = Path(filename).suffix.casefold()
+        if custom_terms and suffix == ".pdf":
+            return self.text_service.redact_pdf(
+                content,
+                content_type,
+                filename,
+                language=selected_language,
+                correlation_id=correlation_id,
+                custom_terms=custom_terms,
+            )
+        if custom_terms and suffix in _NATIVE_DOCUMENT_SUFFIXES:
+            raise ValueError("Custom terms are supported for PDF and text documents only")
+        if suffix in _NATIVE_DOCUMENT_SUFFIXES:
             return self.native_redactor.redact(
                 content,
                 content_type,
@@ -135,6 +220,7 @@ class DocumentAgentService:
             filename,
             language=selected_language,
             correlation_id=correlation_id,
+            custom_terms=custom_terms,
         )
 
 
