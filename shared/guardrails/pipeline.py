@@ -157,6 +157,11 @@ class MedicareDetector:
         return entities
 
 
+def _term_pattern(term: str) -> str:
+    """Escape a term, letting any whitespace run match across spaces and line breaks."""
+    return r"\s+".join(re.escape(word) for word in term.split())
+
+
 class CustomTermDetector:
     """Match user-supplied words or phrases case-insensitively on token boundaries."""
 
@@ -168,7 +173,7 @@ class CustomTermDetector:
         ordered = sorted(cleaned, key=lambda term: (-len(term), term.casefold()))
         self._pattern = (
             re.compile(
-                r"(?<!\w)(?:" + "|".join(re.escape(term) for term in ordered) + r")(?!\w)",
+                r"(?<!\w)(?:" + "|".join(_term_pattern(term) for term in ordered) + r")(?!\w)",
                 re.IGNORECASE,
             )
             if ordered

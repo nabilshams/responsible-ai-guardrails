@@ -15,6 +15,7 @@ from starlette.responses import JSONResponse, StreamingResponse
 
 from agents.document_redaction.factory import create_service
 from shared.guardrails.documents import UnsupportedDocumentError
+from shared.guardrails.file_services import parse_custom_terms
 from shared.guardrails.native_document_pii import NativeDocumentRedactionResult
 
 logging.basicConfig(level=logging.INFO)
@@ -52,6 +53,7 @@ async def handle_invoke(request: Request) -> JSONResponse | StreamingResponse:
             filename,
             language=str(data.get("language") or service.settings.pii_default_language),
             correlation_id=str(request.state.invocation_id),
+            custom_terms=parse_custom_terms(data.get("custom_terms")),
         )
         if isinstance(result, NativeDocumentRedactionResult):
             payload = {
