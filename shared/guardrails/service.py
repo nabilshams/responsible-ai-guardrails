@@ -11,7 +11,9 @@ from .azure_language import AzureLanguagePiiDetector
 from .config import Settings
 from .detectors import PiiDetector
 from .models import DetectedEntity, RedactionResult
+from .pipeline import CompositePiiDetector, CustomTermDetector, SecretPiiDetector
 from .redactor import redact_text
+from .secrets import SecretDetector
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +27,32 @@ class PiiRedactionService:
         detector: PiiDetector | None = None,
     ) -> None:
         self.settings = settings or Settings()
-        self.detector = detector or self._build_detector()
+        self.detector = self._build_pipeline(detector)
+
+    def _build_pipeline(self, primary: PiiDetector | None) -> PiiDetector:
+        detectors: list[PiiDetector] = []
+        if primary is not None:
+            detectors.append(primary)
+        elif self.settings.pii_enable_azure_language:
+            detectors.append(self._build_detector())
+        elif not (
+            self.settings.pii_custom_terms or self.settings.pii_enable_secret_detection
+        ):
+            raise ValueError("At least one PII detector must be enabled")
+        if self.settings.pii_custom_terms:
+            detectors.append(CustomTermDetector(self.settings.pii_custom_terms))
+        if self.settings.pii_enable_secret_detection:
+            detectors.append(
+                SecretPiiDetector(
+                    SecretDetector(
+                        minimum_entropy=self.settings.secret_minimum_entropy,
+                        additional_keywords=self.settings.secret_additional_keywords,
+                    )
+                )
+            )
+        if len(detectors) == 1:
+            return detectors[0]
+        return CompositePiiDetector(detectors)
 
     def _build_detector(self) -> PiiDetector:
         endpoint = self.settings.azure_ai_language_endpoint
