@@ -15,6 +15,7 @@ from .pipeline import (
     CompositePiiDetector,
     CustomTermDetector,
     DateDetector,
+    MedicareDetector,
     SecretPiiDetector,
 )
 from .redactor import redact_text
@@ -44,10 +45,13 @@ class PiiRedactionService:
             self.settings.pii_custom_terms
             or self.settings.pii_enable_secret_detection
             or self.settings.pii_enable_date_detection
+            or self.settings.pii_enable_medicare_detection
         ):
             raise ValueError("At least one PII detector must be enabled")
         if self.settings.pii_enable_date_detection:
             detectors.append(DateDetector())
+        if self.settings.pii_enable_medicare_detection:
+            detectors.append(MedicareDetector())
         if self.settings.pii_custom_terms:
             detectors.append(CustomTermDetector(self.settings.pii_custom_terms))
         if self.settings.pii_enable_secret_detection:

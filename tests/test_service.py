@@ -153,3 +153,61 @@ def test_date_detector_replaces_partial_azure_span() -> None:
 )
 def test_date_detector_ignores_non_dates(text: str) -> None:
     assert DateDetector().detect(text) == []
+
+
+MEDICARE_SOURCE = "deterministic-medicare-detector"
+
+
+def medicare_service(azure: list[DetectedEntity] | None = None) -> PiiRedactionService:
+    return PiiRedactionService(
+        Settings(pii_enable_azure_language=azure is not None, pii_enable_medicare_detection=True),
+        detector=FixedDetector(azure) if azure is not None else None,
+    )
+
+
+@pytest.mark.parametrize(
+    "number",
+    ["2123456701", "2123 45670 1", "2123-45670-1", "2123 45670 1/2", "2123 45670 1 / 2"],
+)
+def test_medicare_detects_valid_variants(number: str) -> None:
+    result = medicare_service().redact(f"Card {number}, thanks.", correlation_id="m")
+    assert result.redacted_text == "Card [REDACTED:AUMEDICARENUMBER], thanks."
+    assert [(e.category, e.source, e.length) for e in result.entities] == [
+        ("AUMedicareNumber", MEDICARE_SOURCE, len(number))
+    ]
+
+
+def test_medicare_overrides_azure_phone_classification() -> None:
+    text = "Medicare 2123 45670 1 on file"
+    value = "2123 45670 1"
+    phone = DetectedEntity("PhoneNumber", 9, len(value), 1.0, "azure-ai-language", value)
+    result = medicare_service([phone]).redact(text, correlation_id="m")
+    assert result.redacted_text == "Medicare [REDACTED:AUMEDICARENUMBER] on file"
+    assert [e.source for e in result.entities] == [MEDICARE_SOURCE]
+
+
+def test_medicare_keeps_unrelated_azure_entities() -> None:
+    text = "Call 0412 345 678 re 2123456701"
+    phone = DetectedEntity("PhoneNumber", 5, 12, 0.95, "azure-ai-language", "0412 345 678")
+    result = medicare_service([phone]).redact(text, correlation_id="m")
+    assert result.redacted_text == "Call [REDACTED:PHONENUMBER] re [REDACTED:AUMEDICARENUMBER]"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Card 2123456711",  # bad check digit
+        "Card 1123456701",  # invalid leading digit
+        "Card 2123456700",  # issue number 0
+        "Call 0412345678",
+        "Call 02 1234 5670",
+        "Account 12123456701",
+        "Account 21234567012",
+        "Ref 2123-4567-01-9",
+        "Version 2.1234567.01",
+    ],
+)
+def test_medicare_ignores_lookalikes(text: str) -> None:
+    from shared.guardrails.pipeline import MedicareDetector
+
+    assert MedicareDetector().detect(text) == []

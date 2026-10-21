@@ -71,6 +71,7 @@ before redaction.
 | `PII_CUSTOM_TERMS` | `[]` (JSON list) | Case-insensitive words/phrases on token boundaries (`custom-terms`, category `CustomTerm`, confidence 1.0) |
 | `PII_ENABLE_SECRET_DETECTION` | `false` | Deterministic secret signatures (`deterministic-secret-detector`) |
 | `PII_ENABLE_DATE_DETECTION` | `false` | Complete numeric and month-name dates (`deterministic-date-detector`) |
+| `PII_ENABLE_MEDICARE_DETECTION` | `false` | Check-digit-validated Australian Medicare numbers (`deterministic-medicare-detector`, category `AUMedicareNumber`); overrides overlapping phone-number spans |
 
 Defaults reproduce the previous Azure-only text redaction. At least one detector must be
 enabled.
