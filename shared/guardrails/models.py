@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class ReplacementStyle(StrEnum):
     """Supported non-reversible replacement strategies."""
 
-    TOKEN = "token"  # noqa: S105 - redaction style, not a credential
+    TOKEN = "token"  # noqa: S105 - redaction style, not a credential; # nosec B105
     MASK = "mask"
 
 
