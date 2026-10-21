@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     )
     secret_additional_keywords: list[str] = Field(default_factory=list)
 
+    pii_enable_azure_language: bool = True
+    pii_enable_secret_detection: bool = False
+    pii_custom_terms: list[str] = Field(default_factory=list)
+
     azure_ai_language_endpoint: str | None = None
     azure_document_intelligence_endpoint: str | None = None
     azure_document_pii_storage_endpoint: str | None = None

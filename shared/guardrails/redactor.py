@@ -11,7 +11,11 @@ from .models import DetectedEntity, EntityResult, RedactionResult, ReplacementSt
 def normalize_entities(
     entities: Iterable[DetectedEntity], text_length: int, threshold: float
 ) -> list[DetectedEntity]:
-    """Validate spans and resolve overlap by confidence, then span length."""
+    """Validate spans and resolve overlap by confidence, span length, then position.
+
+    Remaining ties are broken by source and category so output never depends on
+    detector ordering.
+    """
     candidates = [
         entity
         for entity in entities
@@ -20,7 +24,14 @@ def normalize_entities(
         and entity.length > 0
         and entity.end <= text_length
     ]
-    ranked = sorted(candidates, key=lambda item: (-item.confidence, -item.length, item.offset))
+    ranked = sorted(candidates, key=lambda item: (
+            -item.confidence,
+            -item.length,
+            item.offset,
+            item.source,
+            item.category,
+        ),
+    )
     selected: list[DetectedEntity] = []
     for entity in ranked:
         if any(entity.offset < current.end and current.offset < entity.end for current in selected):

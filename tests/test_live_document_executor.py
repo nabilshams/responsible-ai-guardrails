@@ -102,6 +102,7 @@ def test_resolve_endpoint_uses_selected_azd_environment(
             stderr="",
         )
 
+    monkeypatch.setattr("scripts.live_agent_client.shutil.which", lambda _: "azd")
     monkeypatch.setattr(subprocess, "run", run_azd)
 
     assert resolve_endpoint() == "https://azd.example.test/invocations"

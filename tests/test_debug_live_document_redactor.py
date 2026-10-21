@@ -147,6 +147,7 @@ def test_main_uses_endpoint_from_selected_azd_environment(
         "AGENT_DOCUMENT_REDACTION_AGENT_INVOCATIONS_ENDPOINT",
         raising=False,
     )
+    monkeypatch.setattr("scripts.live_agent_client.shutil.which", lambda _: "azd")
     monkeypatch.setattr(subprocess, "run", run_azd)
     monkeypatch.setattr(
         "scripts.debug_live_document_redactor.DefaultAzureCredential",

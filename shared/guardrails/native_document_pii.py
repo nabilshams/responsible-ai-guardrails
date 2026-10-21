@@ -293,7 +293,8 @@ class NativeDocumentPiiRedactor:
             for entry in errors:
                 if not isinstance(entry, dict):
                     continue
-                error = entry.get("error") if isinstance(entry.get("error"), dict) else entry
+                nested_error = entry.get("error")
+                error = nested_error if isinstance(nested_error, dict) else entry
                 code = str(error.get("code", "")).strip()
                 message = str(error.get("message", "")).strip()
                 if code and message:
