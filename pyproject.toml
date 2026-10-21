@@ -46,6 +46,7 @@ include = ["agents*", "scripts*", "shared*"]
 [tool.pytest.ini_options]
 addopts = "-ra --strict-markers --cov=agents --cov=shared --cov-report=term-missing --cov-fail-under=80"
 testpaths = ["tests"]
+pythonpath = ["."]
 markers = ["azure: requires configured Azure services"]
 
 [tool.ruff]
