@@ -16,6 +16,9 @@ MAX_CUSTOM_TERM_LENGTH = 256
 DATE_SOURCE = "deterministic-date-detector"
 DATE_CATEGORY = "DateTime"
 DATE_SUBCATEGORY = "Date"
+MEDICARE_SOURCE = "deterministic-medicare-detector"
+MEDICARE_CATEGORY = "AUMedicareNumber"
+_PHONE_CATEGORIES = frozenset({"phonenumber", "phone"})
 
 _MONTHS = {
     "january": 1, "jan": 1, "february": 2, "feb": 2, "march": 3, "mar": 3,
@@ -110,6 +113,50 @@ class DateDetector:
         return sorted(found.values(), key=lambda item: item.offset)
 
 
+_MEDICARE_PATTERN = re.compile(
+    r"(?<![\w.\-/])(?P<card>[2-6]\d{3}[ -]?\d{5}[ -]?\d)(?P<irn>[ ]?/[ ]?\d)?(?![\w\-]|[./]\d)"
+)
+_MEDICARE_WEIGHTS = (1, 3, 7, 9, 1, 3, 7, 9)
+
+
+def is_valid_medicare_number(digits: str) -> bool:
+    """Validate a 10-digit Medicare card number: first digit 2-6, check digit, issue 1-9."""
+    if len(digits) != 10 or not digits.isdigit() or digits[0] not in "23456" or digits[9] == "0":
+        return False
+    total = sum(int(d) * w for d, w in zip(digits[:8], _MEDICARE_WEIGHTS, strict=True))
+    return total % 10 == int(digits[8])
+
+
+class MedicareDetector:
+    """Detect checksum-valid Australian Medicare card numbers.
+
+    Accepts 10 digits with optional space or hyphen separators (4-5-1 grouping) and an
+    optional ``/n`` individual reference number. Invalid check digits are ignored.
+    """
+
+    def __init__(self, *, category: str = MEDICARE_CATEGORY) -> None:
+        self.category = category
+
+    def detect(self, text: str, language: str = "en") -> list[DetectedEntity]:
+        del language
+        entities: list[DetectedEntity] = []
+        for match in _MEDICARE_PATTERN.finditer(text):
+            digits = re.sub(r"\D", "", match.group("card"))
+            if not is_valid_medicare_number(digits):
+                continue
+            entities.append(
+                DetectedEntity(
+                    category=self.category,
+                    offset=match.start(),
+                    length=match.end() - match.start(),
+                    confidence=1.0,
+                    source=MEDICARE_SOURCE,
+                    value=match.group(0),
+                )
+            )
+        return entities
+
+
 class CustomTermDetector:
     """Match user-supplied words or phrases case-insensitively on token boundaries."""
 
@@ -170,4 +217,13 @@ class CompositePiiDetector:
         entities: list[DetectedEntity] = []
         for detector in self.detectors:
             entities.extend(detector.detect(text, language))
-        return entities
+        medicare = [entity for entity in entities if entity.source == MEDICARE_SOURCE]
+        if not medicare:
+            return entities
+        return [
+            entity
+            for entity in entities
+            if entity.source == MEDICARE_SOURCE
+            or entity.category.lower() not in _PHONE_CATEGORIES
+            or not any(entity.offset < m.end and m.offset < entity.end for m in medicare)
+        ]
