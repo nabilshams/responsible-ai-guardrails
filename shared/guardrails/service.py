@@ -11,7 +11,12 @@ from .azure_language import AzureLanguagePiiDetector
 from .config import Settings
 from .detectors import PiiDetector
 from .models import DetectedEntity, RedactionResult
-from .pipeline import CompositePiiDetector, CustomTermDetector, SecretPiiDetector
+from .pipeline import (
+    CompositePiiDetector,
+    CustomTermDetector,
+    DateDetector,
+    SecretPiiDetector,
+)
 from .redactor import redact_text
 from .secrets import SecretDetector
 
@@ -36,9 +41,13 @@ class PiiRedactionService:
         elif self.settings.pii_enable_azure_language:
             detectors.append(self._build_detector())
         elif not (
-            self.settings.pii_custom_terms or self.settings.pii_enable_secret_detection
+            self.settings.pii_custom_terms
+            or self.settings.pii_enable_secret_detection
+            or self.settings.pii_enable_date_detection
         ):
             raise ValueError("At least one PII detector must be enabled")
+        if self.settings.pii_enable_date_detection:
+            detectors.append(DateDetector())
         if self.settings.pii_custom_terms:
             detectors.append(CustomTermDetector(self.settings.pii_custom_terms))
         if self.settings.pii_enable_secret_detection:

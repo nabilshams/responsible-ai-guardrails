@@ -1,5 +1,8 @@
+import pytest
+
 from shared.guardrails.config import Settings
 from shared.guardrails.models import DetectedEntity
+from shared.guardrails.pipeline import DateDetector
 from shared.guardrails.service import PiiRedactionService
 
 
@@ -9,6 +12,15 @@ class StubAzureLanguageDetector:
         value = "synthetic.user@example.test"
         offset = text.index(value)
         return [DetectedEntity("Email", offset, len(value), 0.99, "azure-ai-language", value)]
+
+
+class FixedDetector:
+    def __init__(self, entities: list[DetectedEntity]) -> None:
+        self.entities = entities
+
+    def detect(self, text: str, language: str = "en") -> list[DetectedEntity]:
+        del text, language
+        return self.entities
 
 
 def make_service() -> PiiRedactionService:
@@ -99,3 +111,45 @@ def test_overlap_resolution_is_order_independent() -> None:
     a = DetectedEntity("A", 0, 5, 0.9, "s1", "abcde")
     b = DetectedEntity("B", 0, 5, 0.9, "s2", "abcde")
     assert normalize_entities([a, b], 5, 0.0) == normalize_entities([b, a], 5, 0.0) == [a]
+
+
+@pytest.mark.parametrize(
+    "date_text",
+    ["2026-01-10", "10/01/2026", "10 January 2026", "January 10, 2026", "10 Jan 2026"],
+)
+def test_date_detector_redacts_complete_date(date_text: str) -> None:
+    service = PiiRedactionService(
+        Settings(pii_enable_azure_language=False, pii_enable_date_detection=True),
+    )
+    text = f"Born on {date_text}, per the file."
+    result = service.redact(text, correlation_id="date")
+    assert result.redacted_text == "Born on [REDACTED:DATETIME], per the file."
+    assert [(e.source, e.length) for e in result.entities] == [
+        ("deterministic-date-detector", len(date_text))
+    ]
+
+
+def test_date_detector_replaces_partial_azure_span() -> None:
+    text = "Visit on 10 January 2026."
+    partial = DetectedEntity("DateTime", 9, 7, 0.9, "azure-ai-language", "10 Janu")
+    service = PiiRedactionService(
+        Settings(pii_enable_date_detection=True), detector=FixedDetector([partial])
+    )
+    result = service.redact(text, correlation_id="partial")
+    assert result.redacted_text == "Visit on [REDACTED:DATETIME]."
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Order 12345678 shipped",
+        "Version 1.2.3 and 10.5.2",
+        "Call 555-12-3456",
+        "I may 5 times, in March we rest, 10 Jan",
+        "Total 31/02/2026 is invalid",
+        "Range 2026-13-45",
+        "Part 110/01/2026",
+    ],
+)
+def test_date_detector_ignores_non_dates(text: str) -> None:
+    assert DateDetector().detect(text) == []

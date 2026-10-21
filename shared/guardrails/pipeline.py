@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Sequence
+from datetime import date
 
 from .detectors import PiiDetector
 from .models import DetectedEntity
@@ -12,6 +13,101 @@ from .secrets import SecretDetector
 CUSTOM_TERM_SOURCE = "custom-terms"
 CUSTOM_TERM_CATEGORY = "CustomTerm"
 MAX_CUSTOM_TERM_LENGTH = 256
+DATE_SOURCE = "deterministic-date-detector"
+DATE_CATEGORY = "DateTime"
+DATE_SUBCATEGORY = "Date"
+
+_MONTHS = {
+    "january": 1, "jan": 1, "february": 2, "feb": 2, "march": 3, "mar": 3,
+    "april": 4, "apr": 4, "may": 5, "june": 6, "jun": 6, "july": 7, "jul": 7,
+    "august": 8, "aug": 8, "september": 9, "sept": 9, "sep": 9, "october": 10,
+    "oct": 10, "november": 11, "nov": 11, "december": 12, "dec": 12,
+}  # fmt: skip
+_MONTH = r"(?P<month>" + "|".join(sorted(_MONTHS, key=len, reverse=True)) + r")\.?"
+_YEAR = r"(?P<year>(?:19|20)\d{2})"
+_DAY = r"(?P<day>\d{1,2})(?:st|nd|rd|th)?"
+_BOUND_START = r"(?<![\w.\-/])"
+_BOUND_END = r"(?![\w\-/]|[.,]\d)"
+_DATE_PATTERNS = (
+    # 2026-01-10, 2026/01/10, 2026.01.10
+    re.compile(
+        _BOUND_START
+        + r"(?P<year>(?:19|20)\d{2})(?P<sep>[-/.])(?P<a>\d{1,2})(?P=sep)(?P<b>\d{1,2})"
+        + _BOUND_END
+    ),
+    # 10/01/2026, 10-01-2026, 10.01.2026 (day and month order are both accepted)
+    re.compile(
+        _BOUND_START + r"(?P<a>\d{1,2})(?P<sep>[-/.])(?P<b>\d{1,2})(?P=sep)" + _YEAR + _BOUND_END
+    ),
+    # 10 January 2026, 10th Jan, 2026
+    re.compile(
+        _BOUND_START
+        + _DAY
+        + r"[ \t]+(?:of[ \t]+)?"
+        + _MONTH
+        + r"[ \t]*,?[ \t]*"
+        + _YEAR
+        + _BOUND_END,
+        re.IGNORECASE,
+    ),
+    # January 10, 2026 / Jan. 10th 2026
+    re.compile(
+        _BOUND_START + _MONTH + r"[ \t]+" + _DAY + r"[ \t]*,?[ \t]*" + _YEAR + _BOUND_END,
+        re.IGNORECASE,
+    ),
+)
+
+
+def _is_valid_date(year: int, month: int, day: int) -> bool:
+    try:
+        date(year, month, day)
+    except ValueError:
+        return False
+    return True
+
+
+class DateDetector:
+    """Detect complete calendar dates in explicit numeric and month-name formats.
+
+    Month-name dates require a four-digit year, and numeric dates require a
+    separator-delimited year, so bare numbers and phrases such as "may 5" are ignored.
+    Impossible calendar dates are rejected.
+    """
+
+    def __init__(self, *, category: str = DATE_CATEGORY) -> None:
+        self.category = category
+
+    def detect(self, text: str, language: str = "en") -> list[DetectedEntity]:
+        del language
+        found: dict[tuple[int, int], DetectedEntity] = {}
+        for pattern in _DATE_PATTERNS:
+            for match in pattern.finditer(text):
+                groups = match.groupdict()
+                year = int(groups["year"])
+                if "month" in groups:
+                    month_day = [(_MONTHS[groups["month"].lower()], int(groups["day"]))]
+                else:
+                    first, second = int(groups["a"]), int(groups["b"])
+                    if match.start("year") < match.start("a"):
+                        month_day = [(first, second)]
+                    else:
+                        month_day = [(first, second), (second, first)]
+                if not any(_is_valid_date(year, m, d) for m, d in month_day):
+                    continue
+                span = (match.start(), match.end())
+                found.setdefault(
+                    span,
+                    DetectedEntity(
+                        category=self.category,
+                        subcategory=DATE_SUBCATEGORY,
+                        offset=span[0],
+                        length=span[1] - span[0],
+                        confidence=1.0,
+                        source=DATE_SOURCE,
+                        value=match.group(0),
+                    ),
+                )
+        return sorted(found.values(), key=lambda item: item.offset)
 
 
 class CustomTermDetector:
