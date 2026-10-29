@@ -49,4 +49,6 @@ jobs:
       - name: Preview infrastructure changes
         run: azd -C "infra/${{ inputs.profile }}" provision --preview --no-prompt
       - name: Provision and deploy
-        run: azd -C "infra/${{ inputs.profile }}" up --no-prompt
+        run: |
+          azd -C "infra/${{ inputs.profile }}" up --no-prompt
+          azd -C "infra/${{ inputs.profile }}" hooks run postup --no-prompt

@@ -230,6 +230,7 @@ VNet mode uses a hybrid Foundry network posture. Foundry and Azure Container Reg
 $env:AZURE_DEV_USER_AGENT = "microsoft_foundry_skill"
 azd -C infra/private env new "rai-private" --location "eastus2"
 azd -C infra/private up --no-prompt
+azd -C infra/private hooks run postup --no-prompt
 ```
 
 The [private deployment folder](infra/private) fixes this hybrid VNet posture at compile time and does not accept a network-mode override. Both profiles use Standard ACR with public network access for ordinary remote ACR builds. Registry admin access remains disabled, and Foundry and Container Apps pull images through scoped managed identities. Docker Desktop is not required. Foundry public access still requires Microsoft Entra authentication and project RBAC; local authentication remains disabled.
@@ -256,6 +257,7 @@ azd -C infra/public env set PII_DEFAULT_LANGUAGE "en"
 
 azd -C infra/public provision --preview
 azd -C infra/public up --no-prompt
+azd -C infra/public hooks run postup --no-prompt
 ```
 
 After `azd up`, Bicep outputs and Foundry deployment outputs are persisted in the selected `azd` environment. The private profile uses an explicit provision-before-package workflow so the generated ACR endpoint exists before azd resolves passthrough image references. Its `preprovision` hook removes legacy Premium-only ACR resources when upgrading an existing environment, and its `predeploy` hook builds hosted-agent images with ordinary ACR Tasks. The `postup` hooks configure hosted-agent and web-chat RBAC, build the chat image in ACR, inject the four invocation endpoints into the Container App, and verify required variable names without displaying their values.
@@ -291,3 +293,7 @@ For infrastructure operations, see [infra/README.md](infra/README.md) and [docs/
 ## Contribution Requirements
 
 Never commit real PII, credentials, service keys, tokens, SAS values, production prompts, or unredacted agent responses. Every detector, replacement policy, and overlap rule needs deterministic synthetic tests. Treat a redaction miss as more severe than conservative over-redaction, and measure both before production rollout.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).

@@ -8,6 +8,7 @@ from typing import Any
 import httpx
 import pytest
 from azure.core.credentials import AccessToken
+from azure.core.exceptions import HttpResponseError
 from pypdf import PdfWriter
 
 from shared.guardrails.config import Settings
@@ -214,6 +215,76 @@ def test_rejects_malformed_native_pdf_artifact() -> None:
     assert storage.source.blob is not None
     assert storage.source.blob.deleted
     assert len(storage.target.deleted_names) == 2
+
+
+class BlockedBlob(StubBlob):
+    def __init__(self, url: str, error: Exception) -> None:
+        super().__init__(url)
+        self._error = error
+
+    def upload_blob(self, content: bytes, *, overwrite: bool) -> None:
+        del content, overwrite
+        raise self._error
+
+
+def blocked_storage(error: Exception) -> StubBlobService:
+    storage = StubBlobService(b"")
+
+    def get_blob_client(name: str) -> BlockedBlob:
+        storage.source.blob = BlockedBlob(f"{storage.source.url}/{name}", error)
+        return storage.source.blob
+
+    storage.source.get_blob_client = get_blob_client  # type: ignore[method-assign]
+    return storage
+
+
+def redact_with_storage_error(error: Exception) -> RuntimeError:
+    redactor = NativeDocumentPiiRedactor(
+        configured_settings(),
+        StubCredential(),  # type: ignore[arg-type]
+        blob_service=blocked_storage(error),  # type: ignore[arg-type]
+        http_client=StubHttpClient(),
+        sleep=lambda _: None,
+    )
+    with pytest.raises(RuntimeError) as raised:
+        redactor.redact(
+            valid_pdf(),
+            "application/pdf",
+            "synthetic.pdf",
+            language="en",
+        )
+    return raised.value
+
+
+def test_storage_failure_reports_status_and_error_code_only() -> None:
+    error = HttpResponseError(message="synthetic secret detail https://private.invalid/x")
+    error.status_code = 403
+    error.error_code = "AuthorizationFailure"  # type: ignore[attr-defined]
+
+    failure = redact_with_storage_error(error)
+
+    assert str(failure) == (
+        "Azure AI Language document redaction failed "
+        "(HttpResponseError; status=403; code=AuthorizationFailure)"
+    )
+    assert "secret" not in str(failure)
+    assert "private.invalid" not in str(failure)
+
+
+def test_transport_failure_reports_exception_class_only() -> None:
+    failure = redact_with_storage_error(httpx.ConnectError("synthetic host detail"))
+
+    assert str(failure) == "Azure AI Language document redaction failed (ConnectError)"
+
+
+def test_unsafe_error_code_is_omitted() -> None:
+    error = HttpResponseError(message="synthetic")
+    error.status_code = 400
+    error.error_code = "bad code with spaces and https://private.invalid"  # type: ignore[attr-defined]
+
+    failure = redact_with_storage_error(error)
+
+    assert str(failure).endswith("(HttpResponseError; status=400)")
 
 
 @pytest.mark.parametrize(

@@ -48,7 +48,7 @@ Default values (customizable via azd environment variables):
 - **Container Registry**: Standard public ACR in both profiles, with admin and anonymous access disabled
 - **Hosted-agent compute**: 0.5 vCPU and 1 GiB memory per specialist
 
-Both profiles use ordinary remote ACR builds against a Standard registry with public network access. The private profile's custom `azd up` workflow provisions before packaging so the generated registry endpoint is available when passthrough image references are resolved. Registry access is authenticated through Azure RBAC; no admin credentials or anonymous pulls are enabled. Docker Desktop is not required for either profile.
+Both profiles use ordinary remote ACR builds against a Standard registry with public network access. The generated registry endpoint is used for passthrough image references, and missing runtime identity metadata is resolved from the deployed agents before RBAC configuration. Registry access is authenticated through Azure RBAC; no admin credentials or anonymous pulls are enabled. Docker Desktop is not required for either profile.
 
 ### VNet Deployment
 
@@ -71,6 +71,7 @@ azd -C infra/private provision --preview
 
 # 5. Provision and deploy in one step
 azd -C infra/private up --no-prompt
+azd -C infra/private hooks run postup --no-prompt
 ```
 
 Run these commands from a VNet-connected execution environment because the deployment hooks and supporting services require private network reachability. The Foundry endpoint permits authenticated public access, but Microsoft Entra authentication and project RBAC remain required and local authentication is disabled. The redaction chat, ACR, Azure AI Language, Document Intelligence, Storage, and monitoring have no public data-plane access in this profile.
@@ -83,6 +84,7 @@ Create a separate environment under the public profile:
 $env:AZURE_DEV_USER_AGENT = "microsoft_foundry_skill"
 azd -C infra/public env new "rai-public" --location "eastus2"
 azd -C infra/public up --no-prompt
+azd -C infra/public hooks run postup --no-prompt
 ```
 
 Do not reuse an environment across the two folders. Hosted Agent network injection cannot be added or changed after account creation.

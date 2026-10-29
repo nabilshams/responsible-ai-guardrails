@@ -134,3 +134,22 @@ def test_runs_azure_cli_with_utf8(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert observed_environment["PYTHONIOENCODING"] == "utf-8"
     assert observed_environment["PYTHONUTF8"] == "1"
+
+
+def test_targets_azd_subscription_when_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    observed: list[list[str]] = []
+
+    def run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        observed.append(command)
+        return completed()
+
+    monkeypatch.setattr(deploy_redaction_chat.shutil, "which", lambda command: "az")
+    monkeypatch.setattr(deploy_redaction_chat.subprocess, "run", run)
+    monkeypatch.setenv("AZURE_SUBSCRIPTION_ID", "synthetic-subscription")
+
+    deploy_redaction_chat.run_azure_cli(("version",))
+    monkeypatch.delenv("AZURE_SUBSCRIPTION_ID")
+    deploy_redaction_chat.run_azure_cli(("version",))
+
+    assert observed[0] == ["az", "version", "--subscription", "synthetic-subscription"]
+    assert observed[1] == ["az", "version"]
