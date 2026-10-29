@@ -71,7 +71,6 @@ azd -C infra/private provision --preview
 
 # 5. Provision and deploy in one step
 azd -C infra/private up --no-prompt
-azd -C infra/private hooks run postup --no-prompt
 ```
 
 Run these commands from a VNet-connected execution environment because the deployment hooks and supporting services require private network reachability. The Foundry endpoint permits authenticated public access, but Microsoft Entra authentication and project RBAC remain required and local authentication is disabled. The redaction chat, ACR, Azure AI Language, Document Intelligence, Storage, and monitoring have no public data-plane access in this profile.
@@ -84,14 +83,13 @@ Create a separate environment under the public profile:
 $env:AZURE_DEV_USER_AGENT = "microsoft_foundry_skill"
 azd -C infra/public env new "rai-public" --location "eastus2"
 azd -C infra/public up --no-prompt
-azd -C infra/public hooks run postup --no-prompt
 ```
 
 Do not reuse an environment across the two folders. Hosted Agent network injection cannot be added or changed after account creation.
 
 ### Post-Deployment: Agent Identity RBAC
 
-Each runtime managed identity is created only during `azd deploy`. The `azd up` `postup` hook runs `scripts/configure_agent_rbac.py` to check and create these resource-scoped assignments:
+Each runtime managed identity is created only during `azd deploy`. The `azd up` `postdeploy` hook runs `scripts/configure_agent_rbac.py` to check and create these resource-scoped assignments:
 
 | Hosted agent | Required role assignments |
 | --- | --- |

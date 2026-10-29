@@ -230,7 +230,6 @@ VNet mode uses a hybrid Foundry network posture. Foundry and Azure Container Reg
 $env:AZURE_DEV_USER_AGENT = "microsoft_foundry_skill"
 azd -C infra/private env new "rai-private" --location "eastus2"
 azd -C infra/private up --no-prompt
-azd -C infra/private hooks run postup --no-prompt
 ```
 
 The [private deployment folder](infra/private) fixes this hybrid VNet posture at compile time and does not accept a network-mode override. Both profiles use Standard ACR with public network access for ordinary remote ACR builds. Registry admin access remains disabled, and Foundry and Container Apps pull images through scoped managed identities. Docker Desktop is not required. Foundry public access still requires Microsoft Entra authentication and project RBAC; local authentication remains disabled.
@@ -257,10 +256,9 @@ azd -C infra/public env set PII_DEFAULT_LANGUAGE "en"
 
 azd -C infra/public provision --preview
 azd -C infra/public up --no-prompt
-azd -C infra/public hooks run postup --no-prompt
 ```
 
-After `azd up`, Bicep outputs and Foundry deployment outputs are persisted in the selected `azd` environment. The private profile uses an explicit provision-before-package workflow so the generated ACR endpoint exists before azd resolves passthrough image references. Its `preprovision` hook removes legacy Premium-only ACR resources when upgrading an existing environment, and its `predeploy` hook builds hosted-agent images with ordinary ACR Tasks. The `postup` hooks configure hosted-agent and web-chat RBAC, build the chat image in ACR, inject the four invocation endpoints into the Container App, and verify required variable names without displaying their values.
+After `azd up`, Bicep outputs and Foundry deployment outputs are persisted in the selected `azd` environment. The private profile's `preprovision` hook removes legacy Premium-only ACR resources when upgrading an existing environment, and its `predeploy` hook builds hosted-agent images with ordinary ACR Tasks. The `postdeploy` hooks run automatically at the end of `azd up` or `azd deploy`; they configure hosted-agent and web-chat RBAC, build the chat image in ACR, inject the four invocation endpoints into the Container App, and verify required variable names without displaying their values.
 
 Use a fresh environment when changing profiles because Foundry network injection cannot be changed after account creation. The `S` and `S0` tiers incur usage charges. See [infra/README.md](infra/README.md) for infrastructure-only deployment and retry steps.
 
@@ -273,7 +271,7 @@ The Document Redaction Agent's hosted runtime identity requires these resource-s
 | Azure AI Language | Cognitive Services User | Submit and poll native document PII jobs |
 | Temporary document Storage account | Storage Blob Data Contributor | Upload source files and download/delete redacted artifacts |
 
-The `postup` hooks configure these assignments. `Cognitive Services Language Reader` is not sufficient because it does not authorize the native `/language/analyze-documents/jobs` operation. See [infra/README.md](infra/README.md#post-deployment-agent-identity-rbac) for manual recovery commands and the complete specialist-agent RBAC matrix.
+The `postdeploy` hooks configure these assignments. `Cognitive Services Language Reader` is not sufficient because it does not authorize the native `/language/analyze-documents/jobs` operation. See [infra/README.md](infra/README.md#post-deployment-agent-identity-rbac) for manual recovery commands and the complete specialist-agent RBAC matrix.
 
 ## Troubleshooting
 

@@ -94,7 +94,7 @@ def test_profile_manifests_use_in_project_hook_launchers() -> None:
         manifest = (INFRA_ROOT / profile / "azure.yaml").read_text(encoding="utf-8")
 
         assert 'azure.ai.projects: ">=1.0.0-beta.14"' in manifest
-        assert "postup:" in manifest
+        assert "postdeploy:" in manifest
         assert "../../scripts" not in manifest
         for hook in (
             "prepare_public_acr",
