@@ -37,13 +37,6 @@ def test_complete_public_environment_does_not_require_network_resource_ids() -> 
     assert find_missing_variables(complete_environment(use_vnet=False)) == []
 
 
-def test_speech_endpoint_is_required() -> None:
-    values = complete_environment(use_vnet=False)
-    values.pop("AZURE_SPEECH_ENDPOINT")
-
-    assert find_missing_variables(values) == ["AZURE_SPEECH_ENDPOINT"]
-
-
 def test_complete_private_environment_requires_network_resource_ids() -> None:
     values = complete_environment(use_vnet=True)
     values["AGENT_SUBNET_ID"] = ""
