@@ -30,6 +30,17 @@ samples/output/*
 *.redacted.png
 *.redacted.txt
 
+# Generated Sensitive Data Protection demo media and browser state
+demo/output/*
+!demo/output/.gitkeep
+demo/node_modules/
+demo/playwright-report/
+demo/test-results/
+demo/.playwright/
+demo/downloads/
+demo/browser-profiles/
+demo/narration/*.wav
+
 # Editors and OS
 .vscode/*.log
 .DS_Store

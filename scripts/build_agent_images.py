@@ -31,8 +31,11 @@ def run_azure_cli(
     environment = os.environ.copy()
     environment["PYTHONIOENCODING"] = "utf-8"
     environment["PYTHONUTF8"] = "1"
+    # Target the azd environment's subscription, not Azure CLI's default one.
+    subscription = environment.get("AZURE_SUBSCRIPTION_ID", "").strip()
+    scope = ("--subscription", subscription) if subscription else ()
     return subprocess.run(  # noqa: S603 - executable is resolved from PATH.
-        [executable, *arguments],
+        [executable, *arguments, *scope],
         capture_output=True,
         check=False,
         env=environment,

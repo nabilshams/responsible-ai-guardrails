@@ -4,6 +4,7 @@ requiredVersions:
   azd: ">=1.27.1"
 extensions:
   azure.ai.agents: ">=1.0.0-beta.9"
+  azure.ai.projects: ">=1.0.0-beta.14"
 services:
   ai-project:
     host: azure.ai.project
@@ -14,13 +15,12 @@ services:
     name: pii-redaction-agent
     displayName: PII Redaction Agent
     description: Detects PII with Azure AI Language and redacts text, prompts, and responses.
-    project: ../..
+    project: .
+    image: ${AZURE_CONTAINER_REGISTRY_ENDPOINT=bootstrap.invalid}/pii-redaction-agent:${AZURE_ENV_NAME}
     language: docker
     docker:
-      path: Dockerfile
-      remoteBuild: true
-      buildArgs:
-        - AGENT_MODULE=agents.pii_redaction.main
+      imagePassthrough: true
+      remoteBuild: false
     uses:
       - ai-project
     protocols:
@@ -44,13 +44,12 @@ services:
     name: secret-detection-agent
     displayName: Secret and Credential Detection Agent
     description: Deterministically detects and redacts runtime credentials without transmitting matched values.
-    project: ../..
+    project: .
+    image: ${AZURE_CONTAINER_REGISTRY_ENDPOINT=bootstrap.invalid}/secret-detection-agent:${AZURE_ENV_NAME}
     language: docker
     docker:
-      path: Dockerfile
-      remoteBuild: true
-      buildArgs:
-        - AGENT_MODULE=agents.secret_detection.main
+      imagePassthrough: true
+      remoteBuild: false
     uses:
       - ai-project
     protocols:
@@ -71,13 +70,12 @@ services:
     name: document-redaction-agent
     displayName: Document Redaction Agent
     description: Redacts PII and secrets in structured text files and preserves native PDF and DOCX layout for PII.
-    project: ../..
+    project: .
+    image: ${AZURE_CONTAINER_REGISTRY_ENDPOINT=bootstrap.invalid}/document-redaction-agent:${AZURE_ENV_NAME}
     language: docker
     docker:
-      path: Dockerfile
-      remoteBuild: true
-      buildArgs:
-        - AGENT_MODULE=agents.document_redaction.main
+      imagePassthrough: true
+      remoteBuild: false
     uses:
       - ai-project
     protocols:
@@ -104,13 +102,12 @@ services:
     name: image-redaction-agent
     displayName: Image Redaction Agent
     description: Masks image pixels containing PII using Azure Document Intelligence OCR and Azure AI Language.
-    project: ../..
+    project: .
+    image: ${AZURE_CONTAINER_REGISTRY_ENDPOINT=bootstrap.invalid}/image-redaction-agent:${AZURE_ENV_NAME}
     language: docker
     docker:
-      path: Dockerfile
-      remoteBuild: true
-      buildArgs:
-        - AGENT_MODULE=agents.image_redaction.main
+      imagePassthrough: true
+      remoteBuild: false
     uses:
       - ai-project
     protocols:
@@ -133,6 +130,10 @@ infra:
   path: .
   module: main
 hooks:
+  preprovision:
+    - run: ./scripts/prepare_public_acr.py
+  predeploy:
+    - run: ./scripts/build_agent_images.py
   postup:
     - run: ./scripts/configure_agent_rbac.py
     - run: ./scripts/deploy_redaction_chat.py

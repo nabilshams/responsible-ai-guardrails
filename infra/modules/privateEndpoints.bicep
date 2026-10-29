@@ -10,6 +10,7 @@ param peSubnetId string
 // Resource IDs to create private endpoints for
 param aiServicesId string
 param aiLanguageId string
+param speechId string
 param docIntelligenceId string
 param amplsId string
 param documentStorageId string
@@ -104,6 +105,43 @@ resource aiLanguagePrivateEndpointDnsGroup 'Microsoft.Network/privateEndpoints/p
     privateDnsZoneConfigs: [
       {
         name: 'cognitiveservices-config'
+        properties: {
+          privateDnsZoneId: cognitiveServicesDnsZoneId
+        }
+      }
+    ]
+  }
+}
+
+resource speechPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
+  name: 'pe-speech'
+  location: location
+  tags: tags
+  properties: {
+    subnet: {
+      id: peSubnetId
+    }
+    privateLinkServiceConnections: [
+      {
+        name: 'speech-connection'
+        properties: {
+          privateLinkServiceId: speechId
+          groupIds: [
+            'account'
+          ]
+        }
+      }
+    ]
+  }
+}
+
+resource speechPrivateEndpointDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
+  parent: speechPrivateEndpoint
+  name: 'default'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'cognitive-services-config'
         properties: {
           privateDnsZoneId: cognitiveServicesDnsZoneId
         }
@@ -245,6 +283,7 @@ resource documentStoragePrivateEndpointDnsGroup 'Microsoft.Network/privateEndpoi
 
 output aiServicesPrivateEndpointId string = aiServicesPrivateEndpoint.id
 output aiLanguagePrivateEndpointId string = aiLanguagePrivateEndpoint.id
+output speechPrivateEndpointId string = speechPrivateEndpoint.id
 output docIntelligencePrivateEndpointId string = docIntelligencePrivateEndpoint.id
 output amplsPrivateEndpointId string = amplsPrivateEndpoint.id
 output documentStoragePrivateEndpointId string = documentStoragePrivateEndpoint.id

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 
 import pytest
@@ -63,8 +64,49 @@ def test_reports_only_missing_variable_names() -> None:
     )
 
 
+def test_resolves_missing_agent_principal(monkeypatch: pytest.MonkeyPatch) -> None:
+    values = assignment_environment()
+    variable = "AGENT_PII_REDACTION_AGENT_INSTANCE_IDENTITY_PRINCIPAL_ID"
+    values.pop(variable)
+    monkeypatch.setattr(
+        configure_agent_rbac,
+        "run_azd_cli",
+        lambda arguments: completed(
+            json.dumps(
+                {"instance_identity": {"principal_id": "resolved-synthetic-id"}}
+            )
+        ),
+    )
+
+    resolved = configure_agent_rbac.resolve_agent_principals(values)
+
+    assert resolved[variable] == "resolved-synthetic-id"
+
+
+def test_rejects_agent_without_runtime_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    values = assignment_environment()
+    values.pop("AGENT_PII_REDACTION_AGENT_INSTANCE_IDENTITY_PRINCIPAL_ID")
+    monkeypatch.setattr(
+        configure_agent_rbac,
+        "run_azd_cli",
+        lambda arguments: completed("{}"),
+    )
+
+    with pytest.raises(RuntimeError, match="Could not resolve pii-redaction-agent"):
+        configure_agent_rbac.resolve_agent_principals(values)
+
+
 def test_reports_missing_azure_cli(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(configure_agent_rbac.shutil, "which", lambda command: None)
 
     with pytest.raises(RuntimeError, match="Azure CLI is required"):
         configure_agent_rbac.run_azure_cli(("version",))
+
+
+def test_reports_missing_azd_cli(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(configure_agent_rbac.shutil, "which", lambda command: None)
+
+    with pytest.raises(RuntimeError, match="Azure Developer CLI is required"):
+        configure_agent_rbac.run_azd_cli(("version",))

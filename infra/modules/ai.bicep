@@ -7,6 +7,7 @@ param location string
 param tags object
 param aiServicesName string
 param aiLanguageName string
+param speechName string
 param docIntelligenceName string
 param aiLanguageSku string
 param docIntelligenceSku string
@@ -77,6 +78,30 @@ resource aiLanguage 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
       virtualNetworkRules: []
     }
     disableLocalAuth: true // Managed identity only
+  }
+}
+
+// Azure AI Speech for demo narration
+resource speech 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
+  name: speechName
+  location: location
+  tags: tags
+  kind: 'SpeechServices'
+  sku: {
+    name: 'S0'
+  }
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    customSubDomainName: speechName
+    publicNetworkAccess: publicNetworkAccess
+    networkAcls: {
+      defaultAction: networkDefaultAction
+      ipRules: []
+      virtualNetworkRules: []
+    }
+    disableLocalAuth: true
   }
 }
 
@@ -197,6 +222,9 @@ output aiLanguageId string = aiLanguage.id
 output aiLanguageName string = aiLanguage.name
 output aiLanguageEndpoint string = aiLanguage.properties.endpoint
 output aiLanguageSystemPrincipalId string = aiLanguage.identity.principalId
+output speechId string = speech.id
+output speechName string = speech.name
+output speechEndpoint string = speech.properties.endpoint
 output docIntelligenceId string = docIntelligence.id
 output docIntelligenceName string = docIntelligence.name
 output docIntelligenceEndpoint string = docIntelligence.properties.endpoint

@@ -67,24 +67,25 @@ def test_private_manifest_uses_prebuilt_public_acr_images() -> None:
     assert manifest.count("${AZURE_CONTAINER_REGISTRY_ENDPOINT=bootstrap.invalid}") == 4
     assert "agents.secret_detection.main" not in manifest
     assert "/secret-detection-agent:${AZURE_ENV_NAME}" in manifest
-    assert "- azd: provision" in manifest
-    assert "- azd: package --all" in manifest
-    assert "- azd: deploy --all" in manifest
-    assert manifest.index("- azd: provision") < manifest.index("- azd: package --all")
+    assert "workflows:" not in manifest
     assert "run: ./scripts/prepare_public_acr.py" in manifest
     assert "run: ./scripts/build_agent_images.py" in manifest
     assert "codeConfiguration:" not in manifest
 
 
-def test_public_manifest_uses_standard_acr_remote_builds() -> None:
+def test_public_manifest_uses_prebuilt_public_acr_images() -> None:
     manifest = (INFRA_ROOT / "public" / "azure.yaml").read_text(encoding="utf-8")
 
-    assert manifest.count("project: ../..") == 4
+    assert manifest.count("project: .") == 4
     assert manifest.count("language: docker") == 4
-    assert manifest.count("remoteBuild: true") == 4
-    assert manifest.count("path: Dockerfile") == 4
-    assert manifest.count("AGENT_MODULE=") == 4
-    assert "AGENT_MODULE=agents.secret_detection.main" in manifest
+    assert manifest.count("imagePassthrough: true") == 4
+    assert manifest.count("remoteBuild: false") == 4
+    assert manifest.count("${AZURE_CONTAINER_REGISTRY_ENDPOINT=bootstrap.invalid}") == 4
+    assert "agents.secret_detection.main" not in manifest
+    assert "/secret-detection-agent:${AZURE_ENV_NAME}" in manifest
+    assert "workflows:" not in manifest
+    assert "run: ./scripts/prepare_public_acr.py" in manifest
+    assert "run: ./scripts/build_agent_images.py" in manifest
     assert "codeConfiguration:" not in manifest
 
 
@@ -92,8 +93,12 @@ def test_profile_manifests_use_in_project_hook_launchers() -> None:
     for profile in ("private", "public"):
         manifest = (INFRA_ROOT / profile / "azure.yaml").read_text(encoding="utf-8")
 
+        assert 'azure.ai.projects: ">=1.0.0-beta.14"' in manifest
+        assert "postup:" in manifest
         assert "../../scripts" not in manifest
         for hook in (
+            "prepare_public_acr",
+            "build_agent_images",
             "configure_agent_rbac",
             "deploy_redaction_chat",
             "validate_azd_environment",

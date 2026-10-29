@@ -11,6 +11,25 @@ def completed(returncode: int = 0) -> subprocess.CompletedProcess[str]:
     return subprocess.CompletedProcess([], returncode, stdout="", stderr="")
 
 
+def test_targets_azd_subscription_when_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    observed: list[list[str]] = []
+
+    def run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        observed.append(command)
+        return completed()
+
+    monkeypatch.setattr(build_agent_images.shutil, "which", lambda command: "az")
+    monkeypatch.setattr(build_agent_images.subprocess, "run", run)
+    monkeypatch.setenv("AZURE_SUBSCRIPTION_ID", "synthetic-subscription")
+
+    build_agent_images.run_azure_cli(("version",))
+    monkeypatch.delenv("AZURE_SUBSCRIPTION_ID")
+    build_agent_images.run_azure_cli(("version",))
+
+    assert observed[0] == ["az", "version", "--subscription", "synthetic-subscription"]
+    assert observed[1] == ["az", "version"]
+
+
 def test_builds_each_agent_with_standard_acr_tasks(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

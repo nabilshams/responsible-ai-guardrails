@@ -30,6 +30,7 @@ _NATIVE_CONTENT_TYPES = {
 _COGNITIVE_SERVICES_SCOPE = "https://cognitiveservices.azure.com/.default"
 _DOCX_REQUIRED_MEMBERS = frozenset({"[Content_Types].xml", "word/document.xml"})
 _SAFE_ERROR_TARGET = re.compile(r"^[A-Za-z][A-Za-z0-9_.\[\]-]*$")
+_SAFE_ERROR_CODE = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{0,63}$")
 
 
 def validate_native_document(content: bytes, suffix: str) -> None:
@@ -173,10 +174,25 @@ class NativeDocumentPiiRedactor:
                 correlation_id=request_id,
             )
         except (AzureError, httpx.HTTPError) as exc:
-            raise RuntimeError("Azure AI Language document redaction failed") from exc
+            raise RuntimeError(
+                "Azure AI Language document redaction failed "
+                f"({self.safe_transport_diagnostic(exc)})"
+            ) from exc
         finally:
             self._delete_if_present(source_blob)
             self._delete_targets(target_container, target_names)
+
+    @staticmethod
+    def safe_transport_diagnostic(error: Exception) -> str:
+        """Describe a storage or HTTP failure without messages, URLs, or content."""
+        parts = [type(error).__name__]
+        status = getattr(error, "status_code", None)
+        if isinstance(status, int):
+            parts.append(f"status={status}")
+        code = str(getattr(error, "error_code", "") or "").strip()
+        if code and _SAFE_ERROR_CODE.fullmatch(code):
+            parts.append(f"code={code}")
+        return "; ".join(parts)
 
     def _authorization_headers(self) -> dict[str, str]:
         token = self._credential.get_token(_COGNITIVE_SERVICES_SCOPE)

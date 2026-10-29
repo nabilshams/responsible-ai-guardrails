@@ -76,6 +76,7 @@ var resourceNames = {
   aiServices: take('${abbrs.cognitiveServicesAccounts}foundry-${environmentName}-${uniqueSuffix}', 64)
   aiProject: 'aiproj-${environmentName}'
   aiLanguage: take('${abbrs.cognitiveServicesAccounts}language-${environmentName}-${uniqueSuffix}', 64)
+  speech: take('${abbrs.cognitiveServicesAccounts}speech-${environmentName}-${uniqueSuffix}', 64)
   docIntelligence: take('${abbrs.cognitiveServicesAccounts}docintel-${environmentName}-${uniqueSuffix}', 64)
   documentStorage: take('st${normalizedEnvironmentName}${uniqueSuffix}', 24)
   logAnalytics: '${abbrs.operationalInsightsWorkspaces}${environmentName}'
@@ -159,6 +160,7 @@ module ai 'modules/ai.bicep' = {
     tags: tags
     aiServicesName: resourceNames.aiServices
     aiLanguageName: resourceNames.aiLanguage
+    speechName: resourceNames.speech
     docIntelligenceName: resourceNames.docIntelligence
     aiLanguageSku: aiLanguageSku
     docIntelligenceSku: docIntelligenceSku
@@ -188,6 +190,7 @@ module privateEndpoints 'modules/privateEndpoints.bicep' = if (useVnet) {
     peSubnetId: network!.outputs.peSubnetId
     aiServicesId: ai.outputs.aiServicesId
     aiLanguageId: ai.outputs.aiLanguageId
+    speechId: ai.outputs.speechId
     docIntelligenceId: ai.outputs.docIntelligenceId
     amplsId: monitoring.outputs.amplsId
     documentStorageId: documentStorage.outputs.storageAccountId
@@ -282,6 +285,8 @@ output AZURE_AI_ACCOUNT_NAME string = ai.outputs.aiServicesName
 output AZURE_AI_AISERVICES_ACCOUNT_NAME string = ai.outputs.aiServicesName
 output AZURE_AI_LANGUAGE_ENDPOINT string = ai.outputs.aiLanguageEndpoint
 output AZURE_AI_LANGUAGE_RESOURCE_ID string = ai.outputs.aiLanguageId
+output AZURE_SPEECH_ENDPOINT string = ai.outputs.speechEndpoint
+output AZURE_SPEECH_RESOURCE_ID string = ai.outputs.speechId
 output AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT string = ai.outputs.docIntelligenceEndpoint
 output AZURE_DOCUMENT_INTELLIGENCE_RESOURCE_ID string = ai.outputs.docIntelligenceId
 output AZURE_DOCUMENT_PII_STORAGE_ENDPOINT string = documentStorage.outputs.blobEndpoint
