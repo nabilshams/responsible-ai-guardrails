@@ -142,7 +142,6 @@ azd -C infra/public hooks run postup --no-prompt
 - `azd provision` writes Azure context, selected deployment settings, resource IDs, and service endpoints from Bicep outputs.
 - `azd deploy` writes each hosted agent's name, version, runtime identity, and invocation endpoint.
 - The `postup` hooks configure managed-identity RBAC, remotely build and deploy the redaction chat, inject agent endpoints into its server-side environment, and validate required variable names without printing their values.
-- Bicep provisions Azure AI Speech separately from Azure AI Language and exports `AZURE_SPEECH_ENDPOINT` and `AZURE_SPEECH_RESOURCE_ID`; the demo uses Speech for narration.
 
 Defaults such as network prefixes, SKUs, `PII_CONFIDENCE_THRESHOLD`, and `PII_DEFAULT_LANGUAGE` are also emitted as outputs, so they appear in `azd env get-values` even when the user did not set them explicitly. Public deployments retain empty VNet resource IDs by design.
 
@@ -158,7 +157,7 @@ If infrastructure succeeds but an agent deployment fails, retry only the deploym
 azd -C infra/public deploy --no-prompt
 ```
 
-The `S` and `S0` Cognitive Services tiers incur usage charges. The Speech resource uses `S0`. You can try `F0` only when the subscription has free-tier capacity available.
+The `S` and `S0` Cognitive Services tiers incur usage charges. You can try `F0` only when the subscription has free-tier capacity available.
 
 In VNet mode, Storage public network access remains disabled. Native PDF, DOCX, and TXT redaction must use a private service-to-storage path; do not enable Storage public access as a workaround.
 
